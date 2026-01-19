@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-TRACK CONSOLE MIXER</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="images/icon.png">
+</head>
+<body>
+    <!-- Header Transport Controls -->
+    <header class="transport-bar">
+        <div class="logo">
+            <h1>4-TRACK CONSOLE</h1>
+        </div>
+        <div class="transport-controls">
+            <button id="play-all" class="transport-btn">▶ PLAY</button>
+            <button id="stop-all" class="transport-btn">◼ STOP</button>
+            <button id="clear-all" class="transport-btn">CLEAR ALL</button>
+            <button id="export-mix" class="transport-btn">EXPORT MIX</button>
+            <div class="tempo-display">
+                <label>BPM: <span id="tempo-value">120</span></label>
+                <input type="range" id="tempo-control" min="60" max="200" value="120">
+            </div>
+        </div>
+        <div class="input-source-control">
+            <label>INPUT
+                <select id="audioSourceSelect" class="audio-source-select">
+                    <option value="none">NO INPUT</option>
+                    <option value="microphone">MICROPHONE</option>
+                    <option value="tab">TAB AUDIO</option>
+                </select>
+            </label>
+        </div>
+        <div class="file-controls">
+            <input type="file" id="file-input" accept="audio/*" multiple style="display: none;">
+            <button id="load-files" class="transport-btn">LOAD FILES</button>
+        </div>
+    </header>
+
+    <!-- Main Mixer Console -->
+    <div class="mixer-console">
+
+        <!-- Track 1 Channel Strip -->
+        <div class="channel-strip" data-track="0">
+            <div class="strip-header">
+                <h3>CH 1</h3>
+                <div class="audio-indicator"></div>
+                <div class="header-buttons">
+                    <button class="rec-btn" data-track="0">REC</button>
+                    <button class="mode-btn" data-track="0">LOOP</button>
+                </div>
+            </div>
+
+            <div class="strip-controls">
+                <!-- Input/Trim Section -->
+                <div class="control-group">
+                    <label>TRIM</label>
+                    <div class="knob-container">
+                        <input type="range" class="trim" data-track="0" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <!-- Gain Boost Section -->
+                <div class="control-group">
+                    <label>GAIN</label>
+                    <div class="knob-container">
+                        <input type="range" class="gain-boost" data-track="0" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <!-- LA-2A Compressor Section -->
+                <div class="control-group compressor-section">
+                    <label>COMPRESSOR</label>
+                    <div class="comp-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">INPUT</span>
+                            <input type="range" class="comp-input" data-track="0" min="0" max="100" value="30">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">REDUCTION</span>
+                            <input type="range" class="comp-reduction" data-track="0" min="0" max="100" value="50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3-Band EQ Section -->
+                <div class="control-group eq-section">
+                    <label>EQ</label>
+                    <div class="eq-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">LOW</span>
+                            <input type="range" class="eq-low" data-track="0" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">MID</span>
+                            <input type="range" class="eq-mid" data-track="0" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">HIGH</span>
+                            <input type="range" class="eq-high" data-track="0" min="-12" max="12" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reverb Send Section -->
+                <div class="control-group">
+                    <label>REV SEND</label>
+                    <div class="knob-container">
+                        <input type="range" class="reverb-send" data-track="0" min="0" max="100" value="0">
+                    </div>
+                </div>
+
+                <!-- Tape Speed Section -->
+                <div class="control-group">
+                    <label>SPEED</label>
+                    <div class="knob-container">
+                        <input type="range" class="speed" data-track="0" min="25" max="200" value="100">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel Fader Section -->
+            <div class="fader-section">
+                <div class="fader-container">
+                    <input type="range" class="channel-fader vertical-fader" data-track="0"
+                           min="0" max="100" value="80" orient="vertical">
+                    <div class="fader-value">80</div>
+                </div>
+                <div class="fader-label">CH 1</div>
+                <div class="channel-buttons">
+                    <button class="mute-btn" data-track="0">M</button>
+                    <button class="solo-btn" data-track="0">S</button>
+                    <button class="clear-btn" data-track="0">CLR</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Track 2 Channel Strip -->
+        <div class="channel-strip" data-track="1">
+            <div class="strip-header">
+                <h3>CH 2</h3>
+                <div class="audio-indicator"></div>
+                <div class="header-buttons">
+                    <button class="rec-btn" data-track="1">REC</button>
+                    <button class="mode-btn" data-track="1">LOOP</button>
+                </div>
+            </div>
+
+            <div class="strip-controls">
+                <!-- Input/Trim Section -->
+                <div class="control-group">
+                    <label>TRIM</label>
+                    <div class="knob-container">
+                        <input type="range" class="trim" data-track="1" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <!-- Gain Boost Section -->
+                <div class="control-group">
+                    <label>GAIN</label>
+                    <div class="knob-container">
+                        <input type="range" class="gain-boost" data-track="1" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <!-- LA-2A Compressor Section -->
+                <div class="control-group compressor-section">
+                    <label>COMPRESSOR</label>
+                    <div class="comp-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">INPUT</span>
+                            <input type="range" class="comp-input" data-track="1" min="0" max="100" value="30">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">REDUCTION</span>
+                            <input type="range" class="comp-reduction" data-track="1" min="0" max="100" value="50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3-Band EQ Section -->
+                <div class="control-group eq-section">
+                    <label>EQ</label>
+                    <div class="eq-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">LOW</span>
+                            <input type="range" class="eq-low" data-track="1" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">MID</span>
+                            <input type="range" class="eq-mid" data-track="1" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">HIGH</span>
+                            <input type="range" class="eq-high" data-track="1" min="-12" max="12" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reverb Send Section -->
+                <div class="control-group">
+                    <label>REV SEND</label>
+                    <div class="knob-container">
+                        <input type="range" class="reverb-send" data-track="1" min="0" max="100" value="0">
+                    </div>
+                </div>
+
+                <!-- Tape Speed Section -->
+                <div class="control-group">
+                    <label>SPEED</label>
+                    <div class="knob-container">
+                        <input type="range" class="speed" data-track="1" min="25" max="200" value="100">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel Fader Section -->
+            <div class="fader-section">
+                <div class="fader-container">
+                    <input type="range" class="channel-fader vertical-fader" data-track="1"
+                           min="0" max="100" value="80" orient="vertical">
+                    <div class="fader-value">80</div>
+                </div>
+                <div class="fader-label">CH 2</div>
+                <div class="channel-buttons">
+                    <button class="mute-btn" data-track="1">M</button>
+                    <button class="solo-btn" data-track="1">S</button>
+                    <button class="clear-btn" data-track="1">CLR</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Track 3 Channel Strip -->
+        <div class="channel-strip" data-track="2">
+            <div class="strip-header">
+                <h3>CH 3</h3>
+                <div class="audio-indicator"></div>
+                <div class="header-buttons">
+                    <button class="rec-btn" data-track="2">REC</button>
+                    <button class="mode-btn" data-track="2">LOOP</button>
+                </div>
+            </div>
+
+            <div class="strip-controls">
+                <!-- Input/Trim Section -->
+                <div class="control-group">
+                    <label>TRIM</label>
+                    <div class="knob-container">
+                        <input type="range" class="trim" data-track="2" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <!-- Gain Boost Section -->
+                <div class="control-group">
+                    <label>GAIN</label>
+                    <div class="knob-container">
+                        <input type="range" class="gain-boost" data-track="2" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <!-- LA-2A Compressor Section -->
+                <div class="control-group compressor-section">
+                    <label>COMPRESSOR</label>
+                    <div class="comp-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">INPUT</span>
+                            <input type="range" class="comp-input" data-track="2" min="0" max="100" value="30">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">REDUCTION</span>
+                            <input type="range" class="comp-reduction" data-track="2" min="0" max="100" value="50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3-Band EQ Section -->
+                <div class="control-group eq-section">
+                    <label>EQ</label>
+                    <div class="eq-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">LOW</span>
+                            <input type="range" class="eq-low" data-track="2" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">MID</span>
+                            <input type="range" class="eq-mid" data-track="2" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">HIGH</span>
+                            <input type="range" class="eq-high" data-track="2" min="-12" max="12" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reverb Send Section -->
+                <div class="control-group">
+                    <label>REV SEND</label>
+                    <div class="knob-container">
+                        <input type="range" class="reverb-send" data-track="2" min="0" max="100" value="0">
+                    </div>
+                </div>
+
+                <!-- Tape Speed Section -->
+                <div class="control-group">
+                    <label>SPEED</label>
+                    <div class="knob-container">
+                        <input type="range" class="speed" data-track="2" min="25" max="200" value="100">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel Fader Section -->
+            <div class="fader-section">
+                <div class="fader-container">
+                    <input type="range" class="channel-fader vertical-fader" data-track="2"
+                           min="0" max="100" value="80" orient="vertical">
+                    <div class="fader-value">80</div>
+                </div>
+                <div class="fader-label">CH 3</div>
+                <div class="channel-buttons">
+                    <button class="mute-btn" data-track="2">M</button>
+                    <button class="solo-btn" data-track="2">S</button>
+                    <button class="clear-btn" data-track="2">CLR</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Track 4 Channel Strip -->
+        <div class="channel-strip" data-track="3">
+            <div class="strip-header">
+                <h3>CH 4</h3>
+                <div class="audio-indicator"></div>
+                <div class="header-buttons">
+                    <button class="rec-btn" data-track="3">REC</button>
+                    <button class="mode-btn" data-track="3">LOOP</button>
+                </div>
+            </div>
+
+            <div class="strip-controls">
+                <!-- Input/Trim Section -->
+                <div class="control-group">
+                    <label>TRIM</label>
+                    <div class="knob-container">
+                        <input type="range" class="trim" data-track="3" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <!-- Gain Boost Section -->
+                <div class="control-group">
+                    <label>GAIN</label>
+                    <div class="knob-container">
+                        <input type="range" class="gain-boost" data-track="3" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <!-- LA-2A Compressor Section -->
+                <div class="control-group compressor-section">
+                    <label>COMPRESSOR</label>
+                    <div class="comp-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">INPUT</span>
+                            <input type="range" class="comp-input" data-track="3" min="0" max="100" value="30">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">REDUCTION</span>
+                            <input type="range" class="comp-reduction" data-track="3" min="0" max="100" value="50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3-Band EQ Section -->
+                <div class="control-group eq-section">
+                    <label>EQ</label>
+                    <div class="eq-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">LOW</span>
+                            <input type="range" class="eq-low" data-track="3" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">MID</span>
+                            <input type="range" class="eq-mid" data-track="3" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">HIGH</span>
+                            <input type="range" class="eq-high" data-track="3" min="-12" max="12" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reverb Send Section -->
+                <div class="control-group">
+                    <label>REV SEND</label>
+                    <div class="knob-container">
+                        <input type="range" class="reverb-send" data-track="3" min="0" max="100" value="0">
+                    </div>
+                </div>
+
+                <!-- Tape Speed Section -->
+                <div class="control-group">
+                    <label>SPEED</label>
+                    <div class="knob-container">
+                        <input type="range" class="speed" data-track="3" min="25" max="200" value="100">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channel Fader Section -->
+            <div class="fader-section">
+                <div class="fader-container">
+                    <input type="range" class="channel-fader vertical-fader" data-track="3"
+                           min="0" max="100" value="80" orient="vertical">
+                    <div class="fader-value">80</div>
+                </div>
+                <div class="fader-label">CH 4</div>
+                <div class="channel-buttons">
+                    <button class="mute-btn" data-track="3">M</button>
+                    <button class="solo-btn" data-track="3">S</button>
+                    <button class="clear-btn" data-track="3">CLR</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Master Channel Strip -->
+        <div class="master-strip">
+            <div class="strip-header">
+                <h3>MASTER</h3>
+                <div class="master-indicator"></div>
+            </div>
+
+            <div class="strip-controls">
+                <!-- Master 3-Band EQ -->
+                <div class="control-group eq-section">
+                    <label>MASTER EQ</label>
+                    <div class="eq-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">LOW</span>
+                            <input type="range" class="master-eq-low" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">MID</span>
+                            <input type="range" class="master-eq-mid" min="-12" max="12" value="0">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">HIGH</span>
+                            <input type="range" class="master-eq-high" min="-12" max="12" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Master Compressor Section -->
+                <div class="control-group compressor-section">
+                    <label>MASTER COMP</label>
+                    <div class="comp-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">THRESH</span>
+                            <input type="range" class="master-comp-threshold" min="0" max="100" value="30">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">MAKEUP</span>
+                            <input type="range" class="master-comp-makeup" min="0" max="100" value="50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Master Reverb Section -->
+                <div class="control-group reverb-section">
+                    <label>REVERB</label>
+                    <div class="reverb-controls">
+                        <div class="knob-container">
+                            <span class="knob-label">SIZE</span>
+                            <input type="range" class="master-reverb-size" min="0" max="100" value="70">
+                        </div>
+                        <div class="knob-container">
+                            <span class="knob-label">MIX</span>
+                            <input type="range" class="master-reverb-mix" min="0" max="100" value="15">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Master Limiter Indicator -->
+                <div class="control-group limiter-section">
+                    <label>LIMITER</label>
+                    <div class="limiter-indicator">
+                        <div class="limiter-led"></div>
+                        <span class="limiter-text">ACTIVE</span>
+                    </div>
+                </div>
+
+                <!-- VU Meters -->
+                <div class="control-group vu-section">
+                    <label>OUTPUT</label>
+                    <div class="vu-meters">
+                        <canvas id="vu-left" width="50" height="150"></canvas>
+                        <canvas id="vu-right" width="50" height="150"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Master Fader Section -->
+            <div class="fader-section master-fader-section">
+                <div class="fader-container">
+                    <input type="range" class="master-fader vertical-fader"
+                           min="0" max="100" value="80" orient="vertical">
+                    <div class="fader-value">80</div>
+                </div>
+                <div class="fader-label">MASTER</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/tape-effects.js"></script>
+    <script src="js/track.js"></script>
+    <script src="js/visualizer.js"></script>
+    <script src="js/recorder.js"></script>
+    <script src="js/ui.js"></script>
+</body>
+</html>
