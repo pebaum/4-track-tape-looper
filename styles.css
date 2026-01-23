@@ -377,17 +377,17 @@ body {
     box-shadow: none;
 }
 
-/* Knob indicator - single line pointing from edge toward center */
+/* Knob indicator - short tick mark near edge */
 .knob-container::after {
     content: '';
     position: absolute;
     width: 2px;
-    height: 14px;
+    height: 8px;  /* Short tick mark */
     background: var(--text-primary);
-    left: calc(50% - 1px);  /* Center the 2px wide line */
-    top: 20px;  /* 16px padding + 4px into knob */
+    left: calc(50% - 1px);
+    top: 19px;  /* Just inside the knob edge */
     transform: rotate(var(--knob-rotation, 0deg));
-    transform-origin: 1px 16px;  /* Rotate around knob center: 1px right (half width), 16px down (to y=36) */
+    transform-origin: 1px 17px;  /* Rotate around knob center (17px down from top: 19+17=36) */
     transition: transform 0.05s ease-out;
     pointer-events: none;
     border-radius: 1px;
