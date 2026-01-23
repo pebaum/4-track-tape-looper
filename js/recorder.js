@@ -64,10 +64,29 @@ class Recorder {
         this.reverbSendBus = this.ctx.createGain();
         this.reverbSendBus.gain.value = 1.0;
 
-        // Master reverb - MASSIVE Deep Listening cistern-style reverb (Pauline Oliveros inspired)
+        // Master reverb - supports up to 45 second decay (Deep Listening style)
         this.masterReverb = this.ctx.createConvolver();
-        this.masterReverbSize = 7.0; // 7 second decay default (large hall)
+        this.masterReverbSize = 7.0; // 7 second decay default
+        // Start with a small buffer, worker will generate larger ones
         this.masterReverb.buffer = this.generateReverbImpulse(this.masterReverbSize, this.masterReverbSize);
+
+        // Initialize reverb web worker for generating large impulses without freezing
+        this.reverbWorker = new Worker('js/reverb-worker.js');
+        this.reverbWorker.onmessage = (e) => {
+            const { leftChannel, rightChannel, length } = e.data;
+            const buffer = this.ctx.createBuffer(2, leftChannel.length, this.ctx.sampleRate);
+            buffer.copyToChannel(new Float32Array(leftChannel), 0);
+            buffer.copyToChannel(new Float32Array(rightChannel), 1);
+            this.masterReverb.buffer = buffer;
+
+            // Cache it
+            const cacheKey = length.toFixed(1);
+            this.reverbCache.set(cacheKey, buffer);
+            if (this.reverbCache.size > 5) {
+                const firstKey = this.reverbCache.keys().next().value;
+                this.reverbCache.delete(firstKey);
+            }
+        };
 
         // Reverb wet/dry mix
         this.reverbMix = this.ctx.createGain();
@@ -152,58 +171,23 @@ class Recorder {
         this.reverbCache = new Map();
     }
 
-    // Generate reverb impulse with early reflections and stereo width
-    // Capped at 10 seconds max to prevent memory issues
+    // Generate reverb impulse (used for initial small buffer only)
+    // Large buffers use the web worker instead
     generateReverbImpulse(decay, length) {
         const sampleRate = this.ctx.sampleRate;
-        // Cap at 10 seconds max to prevent memory crashes
-        const cappedLength = Math.min(length, 10);
-        const cappedDecay = Math.min(decay, 10);
-        const lengthSamples = Math.floor(sampleRate * cappedLength);
+        const lengthSamples = Math.floor(sampleRate * length);
         const impulse = this.ctx.createBuffer(2, lengthSamples, sampleRate);
 
-        // Pre-compute decay constant for efficiency (avoid per-sample Math.exp)
-        const decayRate = 1 / (sampleRate * cappedDecay);
-
-        // Early reflections pattern
-        const earlyReflections = [];
-        const numEarlyReflections = 8;
-        for (let i = 0; i < numEarlyReflections; i++) {
-            earlyReflections.push({
-                sampleStart: Math.floor((0.02 + i * 0.035) * sampleRate),
-                sampleEnd: Math.floor((0.022 + i * 0.035) * sampleRate),
-                amplitude: 0.6 * Math.exp(-i * 0.3),
-                panL: (1 - (Math.random() * 1.6 - 0.8)) / 2,
-                panR: (1 + (Math.random() * 1.6 - 0.8)) / 2
-            });
-        }
+        const decayRate = 1 / (sampleRate * decay);
+        const decayMultiplier = Math.exp(-decayRate);
 
         for (let channel = 0; channel < 2; channel++) {
             const data = impulse.getChannelData(channel);
-            const stereoShift = channel === 0 ? 0.90 : 1.10;
-
-            // Pre-compute envelope using exponential decay
+            const stereoShift = channel === 0 ? 0.9 : 1.1;
             let envelope = 1.0;
-            const decayMultiplier = Math.exp(-decayRate);
 
             for (let i = 0; i < lengthSamples; i++) {
-                let sample = 0;
-
-                // Early reflections (optimized - no per-sample time calculation)
-                for (let r = 0; r < numEarlyReflections; r++) {
-                    const ref = earlyReflections[r];
-                    if (i >= ref.sampleStart && i < ref.sampleEnd) {
-                        const panGain = channel === 0 ? ref.panL : ref.panR;
-                        sample += (Math.random() * 2 - 1) * ref.amplitude * panGain * 0.5;
-                    }
-                }
-
-                // Diffuse tail with pre-computed envelope
-                sample += (Math.random() * 2 - 1) * envelope * stereoShift;
-
-                data[i] = sample * 0.4;
-
-                // Update envelope efficiently
+                data[i] = (Math.random() * 2 - 1) * envelope * stereoShift * 0.4;
                 envelope *= decayMultiplier;
             }
         }
@@ -440,8 +424,8 @@ class Recorder {
     }
 
     setMasterReverbSize(amount) {
-        // amount is 0-1, controls reverb decay time (0.5-10 seconds)
-        const decayTime = 0.5 + (amount * 9.5); // 0.5s to 10s
+        // amount is 0-1, controls reverb decay time (0.5-45 seconds) - MASSIVE range
+        const decayTime = 0.5 + (amount * 44.5); // 0.5s to 45s
         this.masterReverbSize = decayTime;
 
         // Check cache first for performance
@@ -451,22 +435,19 @@ class Recorder {
             return;
         }
 
-        // Debounce: cancel any pending regeneration and wait 300ms after last change
+        // Debounce: cancel any pending regeneration and wait 500ms after last change
         if (this._reverbSizeTimeout) {
             clearTimeout(this._reverbSizeTimeout);
         }
 
         this._reverbSizeTimeout = setTimeout(() => {
-            const newBuffer = this.generateReverbImpulse(decayTime, decayTime);
-            this.masterReverb.buffer = newBuffer;
-
-            // Cache the buffer (limit cache size to 5 most recent)
-            this.reverbCache.set(cacheKey, newBuffer);
-            if (this.reverbCache.size > 5) {
-                const firstKey = this.reverbCache.keys().next().value;
-                this.reverbCache.delete(firstKey);
-            }
-        }, 300);
+            // Use web worker for generation to prevent UI freeze
+            this.reverbWorker.postMessage({
+                decay: decayTime,
+                length: decayTime,
+                sampleRate: this.ctx.sampleRate
+            });
+        }, 500);
     }
 
     // Cassette Tape Bus Controls
