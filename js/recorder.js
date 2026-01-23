@@ -115,6 +115,9 @@ class Recorder {
         this.masterLA2AMakeupGain = this.ctx.createGain();
         this.masterLA2AMakeupGain.gain.value = 1.0; // Unity gain by default (0dB)
 
+        // Cassette Tape Bus - inserted after LA-2A, before master gain
+        this.cassetteTapeBus = new CassetteTapeBus(this.ctx);
+
         // Master gain (master fader)
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = 0.8;
@@ -132,12 +135,13 @@ class Recorder {
         this.masterAnalyser.fftSize = 2048;
         this.masterAnalyser.smoothingTimeConstant = 0.8;
 
-        // Connect master chain: tracks → EQ → LA-2A → LA-2A Makeup Gain → gain + (reverb wet + dry) → limiter → analyser → output
+        // Connect master chain: tracks → EQ → LA-2A → LA-2A Makeup Gain → Cassette Tape Bus → gain + (reverb wet + dry) → limiter → analyser → output
         this.masterEQLow.connect(this.masterEQMid);
         this.masterEQMid.connect(this.masterEQHigh);
         this.masterEQHigh.connect(this.masterLA2A);
         this.masterLA2A.connect(this.masterLA2AMakeupGain);
-        this.masterLA2AMakeupGain.connect(this.masterGain);
+        this.masterLA2AMakeupGain.connect(this.cassetteTapeBus.getInput());
+        this.cassetteTapeBus.getOutput().connect(this.masterGain);
         this.reverbMix.connect(this.masterGain);
         this.reverbDry.connect(this.masterGain);
         this.masterGain.connect(this.masterLimiter);
@@ -458,6 +462,41 @@ class Recorder {
                 this.reverbCache.delete(firstKey);
             }
         }, 0);
+    }
+
+    // Cassette Tape Bus Controls
+    setTapeSaturation(value) {
+        // value is 0-100
+        this.cassetteTapeBus.setSaturation(value);
+    }
+
+    setTapeWow(value) {
+        // value is 0-100
+        this.cassetteTapeBus.setWow(value);
+    }
+
+    setTapeFlutter(value) {
+        // value is 0-100
+        this.cassetteTapeBus.setFlutter(value);
+    }
+
+    setTapeDropouts(value) {
+        // value is 0-100
+        this.cassetteTapeBus.setDropouts(value);
+    }
+
+    setTapeHiss(value) {
+        // value is 0-100
+        this.cassetteTapeBus.setHiss(value);
+    }
+
+    setTapeAge(value) {
+        // value is 0-100
+        this.cassetteTapeBus.setAge(value);
+    }
+
+    setTapeBypass(bypassed) {
+        this.cassetteTapeBus.setBypass(bypassed);
     }
 
     // Tape reel animation

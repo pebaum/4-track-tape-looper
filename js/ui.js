@@ -25,8 +25,6 @@ const domCache = {
     audioIndicators: [],
 
     // Knobs (arrays indexed by track number)
-    trimKnobs: [],
-    gainBoostKnobs: [],
     compInputKnobs: [],
     compReductionKnobs: [],
     eqLowKnobs: [],
@@ -34,6 +32,7 @@ const domCache = {
     eqHighKnobs: [],
     reverbSendKnobs: [],
     speedKnobs: [],
+    revBtns: [],
     channelFaders: [],
     faderValues: [],
 
@@ -46,7 +45,16 @@ const domCache = {
     masterReverbSize: null,
     masterReverbMix: null,
     masterFader: null,
-    masterFaderValue: null
+    masterFaderValue: null,
+
+    // Tape bus controls
+    tapeSaturation: null,
+    tapeWow: null,
+    tapeFlutter: null,
+    tapeDropouts: null,
+    tapeHiss: null,
+    tapeAge: null,
+    tapeBypassBtn: null
 };
 
 // Initialize on page load
@@ -78,8 +86,6 @@ function cacheDOM() {
         domCache.clearBtns[i] = document.querySelector(`.clear-btn[data-track="${i}"]`);
         domCache.audioIndicators[i] = document.querySelector(`.channel-strip[data-track="${i}"] .audio-indicator`);
 
-        domCache.trimKnobs[i] = document.querySelector(`.trim[data-track="${i}"]`);
-        domCache.gainBoostKnobs[i] = document.querySelector(`.gain-boost[data-track="${i}"]`);
         domCache.compInputKnobs[i] = document.querySelector(`.comp-input[data-track="${i}"]`);
         domCache.compReductionKnobs[i] = document.querySelector(`.comp-reduction[data-track="${i}"]`);
         domCache.eqLowKnobs[i] = document.querySelector(`.eq-low[data-track="${i}"]`);
@@ -87,6 +93,7 @@ function cacheDOM() {
         domCache.eqHighKnobs[i] = document.querySelector(`.eq-high[data-track="${i}"]`);
         domCache.reverbSendKnobs[i] = document.querySelector(`.reverb-send[data-track="${i}"]`);
         domCache.speedKnobs[i] = document.querySelector(`.speed[data-track="${i}"]`);
+        domCache.revBtns[i] = document.querySelector(`.rev-btn[data-track="${i}"]`);
         domCache.channelFaders[i] = document.querySelector(`.channel-fader[data-track="${i}"]`);
         domCache.faderValues[i] = domCache.channelFaders[i]?.parentElement?.querySelector('.fader-value');
     }
@@ -101,6 +108,15 @@ function cacheDOM() {
     domCache.masterReverbMix = document.querySelector('.master-reverb-mix');
     domCache.masterFader = document.querySelector('.master-fader');
     domCache.masterFaderValue = domCache.masterFader?.parentElement?.querySelector('.fader-value');
+
+    // Tape bus controls
+    domCache.tapeSaturation = document.querySelector('.tape-saturation');
+    domCache.tapeWow = document.querySelector('.tape-wow');
+    domCache.tapeFlutter = document.querySelector('.tape-flutter');
+    domCache.tapeDropouts = document.querySelector('.tape-dropouts');
+    domCache.tapeHiss = document.querySelector('.tape-hiss');
+    domCache.tapeAge = document.querySelector('.tape-age');
+    domCache.tapeBypassBtn = document.querySelector('.tape-bypass-btn');
 }
 
 // Setup knob manager with vertical drag behavior
@@ -109,7 +125,7 @@ function setupKnobManager() {
     document.querySelectorAll('.knob-container input[type="range"]').forEach(input => {
         const container = input.parentElement;
 
-        // Check if this is a speed knob (bipolar)
+        // Speed knobs are now unipolar (0-100, center=50 for 1x)
         const isSpeedKnob = input.classList.contains('speed');
 
         // Create value display
@@ -119,9 +135,9 @@ function setupKnobManager() {
 
         // Determine default value and options
         const options = {
-            bipolar: isSpeedKnob,
-            centerValue: isSpeedKnob ? 0 : undefined,
-            defaultValue: isSpeedKnob ? 0 : parseFloat(input.value),
+            bipolar: false, // Speed is now unipolar
+            centerValue: isSpeedKnob ? 50 : undefined,
+            defaultValue: parseFloat(input.value),
             onChange: () => updateKnobDisplay(input, valueDisplay)
         };
 
@@ -163,16 +179,13 @@ function updateKnobDisplay(input, valueDisplay) {
     const max = parseFloat(input.max) || 100;
     const value = parseFloat(input.value);
 
-    // Speed knob (bipolar)
+    // Speed knob (unipolar: 0=0.25x, 50=1x, 100=4x)
     if (input.classList.contains('speed')) {
-        if (value === 0) {
-            valueDisplay.textContent = '1x';
-        } else if (value > 0) {
-            const rate = Math.pow(4, value / 100).toFixed(1);
-            valueDisplay.textContent = `${rate}x`;
+        const rate = Math.pow(2, (value - 50) / 25);
+        if (rate < 1) {
+            valueDisplay.textContent = rate.toFixed(2) + 'x';
         } else {
-            const rate = Math.pow(4, Math.abs(value) / 100).toFixed(1);
-            valueDisplay.textContent = `R${rate}x`;
+            valueDisplay.textContent = rate.toFixed(1) + 'x';
         }
         return;
     }
@@ -377,16 +390,6 @@ function handleClearClick(trackNumber) {
 function setupTrackKnobs(trackNumber) {
     const track = () => recorder.getTrack(trackNumber);
 
-    // Trim
-    domCache.trimKnobs[trackNumber]?.addEventListener('input', (e) => {
-        track().setTrimGain(e.target.value / 100);
-    });
-
-    // Gain Boost
-    domCache.gainBoostKnobs[trackNumber]?.addEventListener('input', (e) => {
-        track().setGainBoost(e.target.value / 100);
-    });
-
     // Compressor Input
     domCache.compInputKnobs[trackNumber]?.addEventListener('input', (e) => {
         track().setLA2APeakReduction(e.target.value / 100);
@@ -415,9 +418,18 @@ function setupTrackKnobs(trackNumber) {
         track().setReverbSend(e.target.value / 100);
     });
 
-    // Speed (bipolar: -100 to +100)
+    // Speed (unipolar: 0 to 100, center=50 for 1x)
     domCache.speedKnobs[trackNumber]?.addEventListener('input', (e) => {
         track().setSpeed(parseFloat(e.target.value));
+    });
+
+    // Reverse toggle button
+    domCache.revBtns[trackNumber]?.addEventListener('click', () => {
+        const t = track();
+        const revBtn = domCache.revBtns[trackNumber];
+        const isReversed = !t.isReversed;
+        t.setReverse(isReversed);
+        revBtn?.classList.toggle('active', isReversed);
     });
 }
 
@@ -474,6 +486,38 @@ function setupMasterControls() {
         if (domCache.masterFaderValue) {
             domCache.masterFaderValue.textContent = Math.round(e.target.value);
         }
+    });
+
+    // Tape Bus Controls
+    domCache.tapeSaturation?.addEventListener('input', (e) => {
+        recorder.setTapeSaturation(parseFloat(e.target.value));
+    });
+
+    domCache.tapeWow?.addEventListener('input', (e) => {
+        recorder.setTapeWow(parseFloat(e.target.value));
+    });
+
+    domCache.tapeFlutter?.addEventListener('input', (e) => {
+        recorder.setTapeFlutter(parseFloat(e.target.value));
+    });
+
+    domCache.tapeDropouts?.addEventListener('input', (e) => {
+        recorder.setTapeDropouts(parseFloat(e.target.value));
+    });
+
+    domCache.tapeHiss?.addEventListener('input', (e) => {
+        recorder.setTapeHiss(parseFloat(e.target.value));
+    });
+
+    domCache.tapeAge?.addEventListener('input', (e) => {
+        recorder.setTapeAge(parseFloat(e.target.value));
+    });
+
+    // Tape Bypass Button
+    domCache.tapeBypassBtn?.addEventListener('click', () => {
+        const isActive = domCache.tapeBypassBtn.classList.toggle('active');
+        recorder.setTapeBypass(!isActive);
+        domCache.tapeBypassBtn.textContent = isActive ? 'ON' : 'OFF';
     });
 }
 

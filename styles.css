@@ -266,7 +266,8 @@ body {
 }
 
 .rec-btn,
-.mode-btn {
+.mode-btn,
+.rev-btn {
     background: var(--bg-dark);
     border: none;
     color: var(--text-secondary);
@@ -283,7 +284,8 @@ body {
 }
 
 .rec-btn:hover,
-.mode-btn:hover {
+.mode-btn:hover,
+.rev-btn:hover {
     background: var(--bg-light);
     color: var(--text-primary);
 }
@@ -300,7 +302,8 @@ body {
     50% { opacity: 0.7; }
 }
 
-.mode-btn.active {
+.mode-btn.active,
+.rev-btn.active {
     background: var(--text-primary);
     color: var(--bg-black);
 }
@@ -431,6 +434,58 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--spacing-sm);
+}
+
+/* Tape Section */
+.tape-section .tape-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+}
+
+.tape-section .tape-controls-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.tape-bypass-btn {
+    width: 100%;
+    height: 24px;
+    margin-top: var(--spacing-sm);
+    background: var(--bg-dark);
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing);
+    transition: all 0.15s ease;
+}
+
+.tape-bypass-btn:hover {
+    background: var(--bg-light);
+    color: var(--text-primary);
+}
+
+.tape-bypass-btn.active {
+    background: var(--text-primary);
+    color: var(--bg-black);
+}
+
+/* Speed Section */
+.speed-section .speed-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.speed-section .rev-btn {
+    margin-top: var(--spacing-xs);
 }
 
 /* Limiter Section */
@@ -690,13 +745,17 @@ body {
     background: var(--text-secondary);
 }
 
-/* Speed knob bipolar indicator */
-.knob-container.bipolar::after {
-    background: var(--text-primary);
+/* Knob label positioning fix */
+.knob-container {
+    padding-top: 14px; /* Make room for label above */
 }
 
-.knob-container.bipolar[data-direction="reverse"]::after {
-    background: var(--text-secondary);
+.knob-label {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
 }
 
 /* Responsive Design */
