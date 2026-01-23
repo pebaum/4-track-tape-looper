@@ -339,8 +339,10 @@ body {
 .knob-container {
     position: relative;
     width: var(--knob-size-small);
-    height: var(--knob-size-small);
+    min-height: 72px;  /* 14 label + 40 knob + 18 value */
     margin: var(--spacing-xs) auto;
+    padding-top: 16px;   /* Space for label */
+    padding-bottom: 16px; /* Space for value */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -348,8 +350,10 @@ body {
 
 .knob-container input[type="range"] {
     position: absolute;
-    width: 100%;
-    height: 100%;
+    top: 16px;  /* Align with knob visual */
+    left: 0;
+    width: var(--knob-size-small);
+    height: var(--knob-size-small);
     opacity: 0;
     cursor: grab;
     z-index: 2;
@@ -363,8 +367,10 @@ body {
 .knob-container::before {
     content: '';
     position: absolute;
-    width: 100%;
-    height: 100%;
+    top: 16px;  /* Start below label space */
+    left: 0;
+    width: var(--knob-size-small);
+    height: var(--knob-size-small);
     background: var(--bg-medium);
     border: 2px solid var(--border);
     border-radius: 50%;
@@ -376,32 +382,36 @@ body {
     content: '';
     position: absolute;
     width: 2px;
-    height: 40%;
+    height: 16px;  /* Fixed height for indicator */
     background: var(--text-primary);
     left: 50%;
-    top: 10%;
+    top: 20px;  /* 16px label space + 4px inset */
     transform: translateX(-50%);
-    transform-origin: center calc(100% + 10%);
+    transform-origin: center 16px;  /* Rotate around knob center */
     transition: transform 0.05s ease-out;
     pointer-events: none;
     border-radius: 1px;
 }
 
 .knob-label {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
     display: block;
     text-align: center;
     font-size: 8px;
     font-weight: 500;
     color: var(--text-dim);
-    margin-top: var(--spacing-xs);
     text-transform: uppercase;
     letter-spacing: var(--letter-spacing);
+    white-space: nowrap;
 }
 
 /* Knob value display */
 .knob-value-display {
     position: absolute;
-    bottom: -16px;
+    bottom: 0;
     left: 50%;
     transform: translateX(-50%);
     font-size: 9px;
@@ -426,7 +436,7 @@ body {
 .eq-section .eq-controls {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: var(--spacing-xs);
+    gap: var(--spacing-sm);  /* 8px gap for breathing room */
 }
 
 /* Reverb Section */
@@ -745,19 +755,6 @@ body {
     background: var(--text-secondary);
 }
 
-/* Knob label positioning fix */
-.knob-container {
-    padding-top: 14px; /* Make room for label above */
-}
-
-.knob-label {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
     .mixer-console {
@@ -783,7 +780,8 @@ body {
     }
 }
 
-/* Knob rotation via CSS variable */
+/* Knob rotation via CSS variable - override for JS-controlled rotation */
 .knob-container::after {
     transform: translateX(-50%) rotate(var(--knob-rotation, 0deg));
+    transform-origin: center 16px;  /* Rotate around knob center */
 }
