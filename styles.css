@@ -26,7 +26,7 @@
     --knob-size-small: 40px;
     --fader-width: 48px;
     --fader-height: 180px;
-    --strip-width: 144px;
+    --strip-width: 168px;
     --spacing-xs: 4px;
     --spacing-sm: 8px;
     --spacing-md: 16px;
@@ -377,17 +377,17 @@ body {
     box-shadow: none;
 }
 
-/* Knob indicator - single line */
+/* Knob indicator - single line pointing from edge toward center */
 .knob-container::after {
     content: '';
     position: absolute;
     width: 2px;
-    height: 12px;  /* Short indicator line */
+    height: 14px;
     background: var(--text-primary);
-    left: 50%;
-    top: 36px;  /* Center of knob (16px padding + 20px half-knob) */
-    transform: translateX(-50%) rotate(var(--knob-rotation, 0deg));
-    transform-origin: center top;  /* Rotate around the center of the knob */
+    left: calc(50% - 1px);  /* Center the 2px wide line */
+    top: 20px;  /* 16px padding + 4px into knob */
+    transform: rotate(var(--knob-rotation, 0deg));
+    transform-origin: 1px 16px;  /* Rotate around knob center: 1px right (half width), 16px down (to y=36) */
     transition: transform 0.05s ease-out;
     pointer-events: none;
     border-radius: 1px;
