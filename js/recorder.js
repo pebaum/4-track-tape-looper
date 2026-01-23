@@ -66,7 +66,7 @@ class Recorder {
 
         // Master reverb - MASSIVE Deep Listening cistern-style reverb (Pauline Oliveros inspired)
         this.masterReverb = this.ctx.createConvolver();
-        this.masterReverbSize = 15.0; // 15 second decay default (Deep Listening style)
+        this.masterReverbSize = 7.0; // 7 second decay default (large hall)
         this.masterReverb.buffer = this.generateReverbImpulse(this.masterReverbSize, this.masterReverbSize);
 
         // Reverb wet/dry mix
@@ -152,58 +152,59 @@ class Recorder {
         this.reverbCache = new Map();
     }
 
-    // Generate MASSIVE reverb impulse for Deep Listening cistern effect (Pauline Oliveros)
-    // Up to 45-second decay with early reflections and extreme stereo width
+    // Generate reverb impulse with early reflections and stereo width
+    // Capped at 10 seconds max to prevent memory issues
     generateReverbImpulse(decay, length) {
         const sampleRate = this.ctx.sampleRate;
-        const lengthSamples = sampleRate * length;
+        // Cap at 10 seconds max to prevent memory crashes
+        const cappedLength = Math.min(length, 10);
+        const cappedDecay = Math.min(decay, 10);
+        const lengthSamples = Math.floor(sampleRate * cappedLength);
         const impulse = this.ctx.createBuffer(2, lengthSamples, sampleRate);
 
-        // Early reflections pattern (cistern geometry simulation)
+        // Pre-compute decay constant for efficiency (avoid per-sample Math.exp)
+        const decayRate = 1 / (sampleRate * cappedDecay);
+
+        // Early reflections pattern
         const earlyReflections = [];
-        const numEarlyReflections = 12;
+        const numEarlyReflections = 8;
         for (let i = 0; i < numEarlyReflections; i++) {
             earlyReflections.push({
-                time: 0.02 + (i * 0.035) + (Math.random() * 0.015), // 20-500ms
-                amplitude: 0.6 * Math.exp(-i * 0.3), // Exponential decay
-                pan: (Math.random() * 2 - 1) * 0.8 // Random stereo position
+                sampleStart: Math.floor((0.02 + i * 0.035) * sampleRate),
+                sampleEnd: Math.floor((0.022 + i * 0.035) * sampleRate),
+                amplitude: 0.6 * Math.exp(-i * 0.3),
+                panL: (1 - (Math.random() * 1.6 - 0.8)) / 2,
+                panR: (1 + (Math.random() * 1.6 - 0.8)) / 2
             });
         }
 
         for (let channel = 0; channel < 2; channel++) {
             const data = impulse.getChannelData(channel);
+            const stereoShift = channel === 0 ? 0.90 : 1.10;
 
-            // Extreme stereo width (Deep Listening cistern characteristic)
-            const stereoShift = (channel === 0 ? 0.90 : 1.10);
+            // Pre-compute envelope using exponential decay
+            let envelope = 1.0;
+            const decayMultiplier = Math.exp(-decayRate);
 
             for (let i = 0; i < lengthSamples; i++) {
-                const time = i / sampleRate;
                 let sample = 0;
 
-                // Early reflections (0-500ms)
-                if (time < 0.5) {
-                    earlyReflections.forEach(reflection => {
-                        const timeDiff = Math.abs(time - reflection.time);
-                        if (timeDiff < 0.002) { // 2ms window
-                            const reflectionGain = reflection.amplitude * (1 - timeDiff / 0.002);
-                            const panGain = channel === 0 ?
-                                (1 - reflection.pan) / 2 :
-                                (1 + reflection.pan) / 2;
-                            sample += (Math.random() * 2 - 1) * reflectionGain * panGain * 0.5;
-                        }
-                    });
+                // Early reflections (optimized - no per-sample time calculation)
+                for (let r = 0; r < numEarlyReflections; r++) {
+                    const ref = earlyReflections[r];
+                    if (i >= ref.sampleStart && i < ref.sampleEnd) {
+                        const panGain = channel === 0 ? ref.panL : ref.panR;
+                        sample += (Math.random() * 2 - 1) * ref.amplitude * panGain * 0.5;
+                    }
                 }
 
-                // Dense diffuse field (exponential decay tail)
-                const envelope = Math.exp(-i / (sampleRate * decay));
-                const diffuse = (Math.random() * 2 - 1) * envelope * stereoShift;
+                // Diffuse tail with pre-computed envelope
+                sample += (Math.random() * 2 - 1) * envelope * stereoShift;
 
-                // Subtle pitch modulation for natural character
-                const modulation = 1 + Math.sin(i * 0.0001) * 0.001;
+                data[i] = sample * 0.4;
 
-                sample += diffuse * modulation;
-
-                data[i] = sample * 0.5; // Overall gain reduction for headroom
+                // Update envelope efficiently
+                envelope *= decayMultiplier;
             }
         }
 
@@ -439,8 +440,8 @@ class Recorder {
     }
 
     setMasterReverbSize(amount) {
-        // amount is 0-1, controls reverb decay time (1-45 seconds) - MASSIVE Deep Listening range
-        const decayTime = 1 + (amount * 44); // 1s to 45s
+        // amount is 0-1, controls reverb decay time (0.5-10 seconds)
+        const decayTime = 0.5 + (amount * 9.5); // 0.5s to 10s
         this.masterReverbSize = decayTime;
 
         // Check cache first for performance
