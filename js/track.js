@@ -1,6 +1,6 @@
 // Track Class
 // Handles individual track recording, playback, and loop modes
-// Includes bipolar speed control with reverse playback support
+// Includes unipolar speed control (0.25x-4x) with separate reverse toggle
 
 class Track {
     constructor(audioContext, trackNumber, masterDestination, reverbSend) {
@@ -260,48 +260,32 @@ class Track {
         this.gainBoost.gain.value = value * 2;
     }
 
-    // Bipolar speed control: -100 to +100
-    // Center (0) = normal speed (1x)
-    // Right (+100) = forward up to 4x
-    // Left (-100) = reverse up to 4x
-    setSpeed(normalizedValue) {
-        // normalizedValue is -100 to +100 (from knob with min=-100, max=100, center=0)
-        const wasPlaying = this.isPlaying;
+    // Unipolar speed control: 0 to 100
+    // 0 = 0.25x, 50 = 1x, 100 = 4x
+    // Formula: rate = Math.pow(2, (value - 50) / 25)
+    setSpeed(value) {
+        // value is 0 to 100 (from knob with min=0, max=100, center=50)
+        // At 0: Math.pow(2, (0-50)/25) = Math.pow(2, -2) = 0.25
+        // At 50: Math.pow(2, (50-50)/25) = Math.pow(2, 0) = 1.0
+        // At 100: Math.pow(2, (100-50)/25) = Math.pow(2, 2) = 4.0
+        this.playbackRate = Math.pow(2, (value - 50) / 25);
 
-        if (normalizedValue === 0) {
-            // Center position = 1x forward
-            this.playbackRate = 1.0;
-            this.isReversed = false;
-        } else if (normalizedValue > 0) {
-            // Right side: forward, exponential curve up to 4x
-            // Map 0-100 to 1-4 using exponential curve
-            const normalized = normalizedValue / 100; // 0 to 1
-            this.playbackRate = Math.pow(4, normalized); // 1 to 4
-            this.isReversed = false;
-        } else {
-            // Left side: reverse, exponential curve up to 4x
-            // Map -100 to 0 -> 4x to 1x reverse
-            const normalized = Math.abs(normalizedValue) / 100; // 0 to 1
-            this.playbackRate = Math.pow(4, normalized); // 1 to 4
-            this.isReversed = true;
-        }
-
-        // Update currently playing source
+        // Update currently playing source rate
         if (this.source && this.isPlaying) {
-            // Check if we need to switch buffers (forward <-> reverse)
-            const needsBufferSwitch = wasPlaying && (
-                (this.isReversed && this.source.buffer === this.audioBuffer) ||
-                (!this.isReversed && this.source.buffer === this.reversedBuffer)
-            );
+            this.source.playbackRate.value = this.playbackRate;
+        }
+    }
 
-            if (needsBufferSwitch) {
-                // Restart with new direction
-                this.stop();
-                this.play();
-            } else {
-                // Just update rate
-                this.source.playbackRate.value = Math.abs(this.playbackRate);
-            }
+    // Toggle reverse mode
+    setReverse(isReversed) {
+        const wasPlaying = this.isPlaying;
+        const wasReversed = this.isReversed;
+        this.isReversed = isReversed;
+
+        // If playing and direction changed, restart with correct buffer
+        if (wasPlaying && wasReversed !== isReversed) {
+            this.stop();
+            this.play();
         }
     }
 

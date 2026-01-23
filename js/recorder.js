@@ -450,8 +450,12 @@ class Recorder {
             return;
         }
 
-        // Generate new impulse response asynchronously to avoid blocking
-        setTimeout(() => {
+        // Debounce: cancel any pending regeneration and wait 300ms after last change
+        if (this._reverbSizeTimeout) {
+            clearTimeout(this._reverbSizeTimeout);
+        }
+
+        this._reverbSizeTimeout = setTimeout(() => {
             const newBuffer = this.generateReverbImpulse(decayTime, decayTime);
             this.masterReverb.buffer = newBuffer;
 
@@ -461,7 +465,7 @@ class Recorder {
                 const firstKey = this.reverbCache.keys().next().value;
                 this.reverbCache.delete(firstKey);
             }
-        }, 0);
+        }, 300);
     }
 
     // Cassette Tape Bus Controls
