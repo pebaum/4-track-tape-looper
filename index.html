@@ -10,6 +10,30 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Input Source Selection Modal -->
+    <div id="input-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>SELECT INPUT SOURCE</h2>
+            <p class="modal-subtitle">Choose how you want to record audio</p>
+            <div class="modal-options">
+                <button class="modal-option" data-source="microphone">
+                    <span class="option-icon">🎤</span>
+                    <span class="option-label">MICROPHONE</span>
+                    <span class="option-desc">Record from your mic</span>
+                </button>
+                <button class="modal-option" data-source="tab">
+                    <span class="option-icon">🔊</span>
+                    <span class="option-label">BROWSER TAB</span>
+                    <span class="option-desc">Capture audio from another tab</span>
+                </button>
+                <button class="modal-option modal-option-skip" data-source="none">
+                    <span class="option-label">SKIP FOR NOW</span>
+                    <span class="option-desc">Load audio files instead</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Header Transport Controls -->
     <header class="transport-bar">
         <div class="logo">

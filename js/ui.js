@@ -61,7 +61,7 @@ const domCache = {
 document.addEventListener('DOMContentLoaded', () => {
     cacheDOM();
     setupKnobManager();
-    setupStartButton();
+    setupInputModal();
 });
 
 // Cache all DOM elements at init for performance
@@ -209,19 +209,32 @@ function updateKnobDisplay(input, valueDisplay) {
     container.style.setProperty('--knob-rotation', `${angle}deg`);
 }
 
-// Setup start button
-function setupStartButton() {
-    if (!document.getElementById('start-audio')) {
-        const startBtn = document.createElement('button');
-        startBtn.id = 'start-audio';
-        startBtn.textContent = 'START';
-        document.body.appendChild(startBtn);
+// Setup input source modal
+function setupInputModal() {
+    const modal = document.getElementById('input-modal');
+    if (!modal) return;
 
-        startBtn.addEventListener('click', async () => {
-            startBtn.remove();
+    const options = modal.querySelectorAll('.modal-option');
+    options.forEach(option => {
+        option.addEventListener('click', async () => {
+            const source = option.dataset.source;
+
+            // Hide modal immediately
+            modal.classList.add('hidden');
+
+            // Initialize audio system (requires user gesture - this click satisfies it)
             await initializeRecorder();
+
+            // Set the selected audio source
+            if (source !== 'none') {
+                await recorder.setAudioSource(source);
+                // Update the dropdown to match
+                if (domCache.audioSourceSelect) {
+                    domCache.audioSourceSelect.value = source;
+                }
+            }
         });
-    }
+    });
 }
 
 // Initialize the recorder and setup controls

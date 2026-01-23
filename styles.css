@@ -732,27 +732,96 @@ body {
     background: var(--bg-lighter);
 }
 
-/* Start Button Overlay */
-#start-audio {
+/* Input Source Modal */
+.modal-overlay {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 16px;
-    font-weight: 600;
-    padding: var(--spacing-lg) var(--spacing-xl);
-    background: var(--text-primary);
-    color: var(--bg-black);
-    border: none;
-    cursor: pointer;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(13, 13, 13, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     z-index: 1000;
-    text-transform: uppercase;
+}
+
+.modal-overlay.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    padding: var(--spacing-xl);
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+}
+
+.modal-content h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
     letter-spacing: var(--letter-spacing-wide);
+    margin-bottom: var(--spacing-sm);
+}
+
+.modal-subtitle {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-lg);
+}
+
+.modal-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.modal-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--spacing-md);
+    background: var(--bg-medium);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    cursor: pointer;
     transition: all 0.15s ease;
 }
 
-#start-audio:hover {
-    background: var(--text-secondary);
+.modal-option:hover {
+    background: var(--bg-light);
+    border-color: var(--text-secondary);
+}
+
+.modal-option .option-icon {
+    font-size: 24px;
+    margin-bottom: var(--spacing-xs);
+}
+
+.modal-option .option-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: var(--letter-spacing);
+    text-transform: uppercase;
+}
+
+.modal-option .option-desc {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-top: var(--spacing-xs);
+}
+
+.modal-option-skip {
+    background: transparent;
+    border: 1px dashed var(--border);
+    margin-top: var(--spacing-sm);
+}
+
+.modal-option-skip:hover {
+    background: var(--bg-medium);
 }
 
 /* Responsive Design */
