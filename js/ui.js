@@ -1,207 +1,207 @@
-// UI Controller for Vertical Console Mixer
-// Handles all user interactions and wires up the interface
+// UI Controller for 4-Track Tape Looper
+// Handles all user interactions with DOM caching and event delegation
 
 let recorder = null;
 
+// DOM Cache - populated at init for performance
+const domCache = {
+    // Transport
+    playAll: null,
+    stopAll: null,
+    clearAll: null,
+    exportMix: null,
+    loadFiles: null,
+    fileInput: null,
+    audioSourceSelect: null,
+    tempoControl: null,
+    tempoValue: null,
+
+    // Track elements (arrays indexed by track number)
+    recBtns: [],
+    modeBtns: [],
+    muteBtns: [],
+    soloBtns: [],
+    clearBtns: [],
+    audioIndicators: [],
+
+    // Knobs (arrays indexed by track number)
+    trimKnobs: [],
+    gainBoostKnobs: [],
+    compInputKnobs: [],
+    compReductionKnobs: [],
+    eqLowKnobs: [],
+    eqMidKnobs: [],
+    eqHighKnobs: [],
+    reverbSendKnobs: [],
+    speedKnobs: [],
+    channelFaders: [],
+    faderValues: [],
+
+    // Master controls
+    masterEQLow: null,
+    masterEQMid: null,
+    masterEQHigh: null,
+    masterCompThreshold: null,
+    masterCompMakeup: null,
+    masterReverbSize: null,
+    masterReverbMix: null,
+    masterFader: null,
+    masterFaderValue: null
+};
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    setupDoubleClickInput();
-    setupKnobVisuals();
+    cacheDOM();
+    setupKnobManager();
     setupStartButton();
 });
 
-// Setup double-click text input for all controls
-function setupDoubleClickInput() {
-    // For all knobs
+// Cache all DOM elements at init for performance
+function cacheDOM() {
+    // Transport
+    domCache.playAll = document.getElementById('play-all');
+    domCache.stopAll = document.getElementById('stop-all');
+    domCache.clearAll = document.getElementById('clear-all');
+    domCache.exportMix = document.getElementById('export-mix');
+    domCache.loadFiles = document.getElementById('load-files');
+    domCache.fileInput = document.getElementById('file-input');
+    domCache.audioSourceSelect = document.getElementById('audioSourceSelect');
+    domCache.tempoControl = document.getElementById('tempo-control');
+    domCache.tempoValue = document.getElementById('tempo-value');
+
+    // Track elements
+    for (let i = 0; i < 4; i++) {
+        domCache.recBtns[i] = document.querySelector(`.rec-btn[data-track="${i}"]`);
+        domCache.modeBtns[i] = document.querySelector(`.mode-btn[data-track="${i}"]`);
+        domCache.muteBtns[i] = document.querySelector(`.mute-btn[data-track="${i}"]`);
+        domCache.soloBtns[i] = document.querySelector(`.solo-btn[data-track="${i}"]`);
+        domCache.clearBtns[i] = document.querySelector(`.clear-btn[data-track="${i}"]`);
+        domCache.audioIndicators[i] = document.querySelector(`.channel-strip[data-track="${i}"] .audio-indicator`);
+
+        domCache.trimKnobs[i] = document.querySelector(`.trim[data-track="${i}"]`);
+        domCache.gainBoostKnobs[i] = document.querySelector(`.gain-boost[data-track="${i}"]`);
+        domCache.compInputKnobs[i] = document.querySelector(`.comp-input[data-track="${i}"]`);
+        domCache.compReductionKnobs[i] = document.querySelector(`.comp-reduction[data-track="${i}"]`);
+        domCache.eqLowKnobs[i] = document.querySelector(`.eq-low[data-track="${i}"]`);
+        domCache.eqMidKnobs[i] = document.querySelector(`.eq-mid[data-track="${i}"]`);
+        domCache.eqHighKnobs[i] = document.querySelector(`.eq-high[data-track="${i}"]`);
+        domCache.reverbSendKnobs[i] = document.querySelector(`.reverb-send[data-track="${i}"]`);
+        domCache.speedKnobs[i] = document.querySelector(`.speed[data-track="${i}"]`);
+        domCache.channelFaders[i] = document.querySelector(`.channel-fader[data-track="${i}"]`);
+        domCache.faderValues[i] = domCache.channelFaders[i]?.parentElement?.querySelector('.fader-value');
+    }
+
+    // Master controls
+    domCache.masterEQLow = document.querySelector('.master-eq-low');
+    domCache.masterEQMid = document.querySelector('.master-eq-mid');
+    domCache.masterEQHigh = document.querySelector('.master-eq-high');
+    domCache.masterCompThreshold = document.querySelector('.master-comp-threshold');
+    domCache.masterCompMakeup = document.querySelector('.master-comp-makeup');
+    domCache.masterReverbSize = document.querySelector('.master-reverb-size');
+    domCache.masterReverbMix = document.querySelector('.master-reverb-mix');
+    domCache.masterFader = document.querySelector('.master-fader');
+    domCache.masterFaderValue = domCache.masterFader?.parentElement?.querySelector('.fader-value');
+}
+
+// Setup knob manager with vertical drag behavior
+function setupKnobManager() {
+    // Initialize all knobs with the new Knob class
     document.querySelectorAll('.knob-container input[type="range"]').forEach(input => {
         const container = input.parentElement;
 
-        // Create value display element
+        // Check if this is a speed knob (bipolar)
+        const isSpeedKnob = input.classList.contains('speed');
+
+        // Create value display
         const valueDisplay = document.createElement('div');
         valueDisplay.className = 'knob-value-display';
-        valueDisplay.style.position = 'absolute';
-        valueDisplay.style.bottom = '-20px';
-        valueDisplay.style.left = '50%';
-        valueDisplay.style.transform = 'translateX(-50%)';
-        valueDisplay.style.fontSize = '9px';
-        valueDisplay.style.color = '#888';
-        valueDisplay.style.cursor = 'pointer';
         container.appendChild(valueDisplay);
 
-        // Update value display
-        const updateDisplay = () => {
-            const min = parseFloat(input.min) || 0;
-            const max = parseFloat(input.max) || 100;
-            const value = parseFloat(input.value);
-
-            // For EQ controls, show actual dB value
-            if (input.classList.contains('eq-low') || input.classList.contains('eq-mid') ||
-                input.classList.contains('eq-high') || input.classList.contains('master-eq-low') ||
-                input.classList.contains('master-eq-mid') || input.classList.contains('master-eq-high')) {
-                valueDisplay.textContent = value > 0 ? `+${value}` : value;
-            } else {
-                // Normalize to 0-100 for other controls
-                const normalized = Math.round(((value - min) / (max - min)) * 100);
-                valueDisplay.textContent = normalized;
-            }
+        // Determine default value and options
+        const options = {
+            bipolar: isSpeedKnob,
+            centerValue: isSpeedKnob ? 0 : undefined,
+            defaultValue: isSpeedKnob ? 0 : parseFloat(input.value),
+            onChange: () => updateKnobDisplay(input, valueDisplay)
         };
 
-        // Initial display
-        updateDisplay();
-        input.addEventListener('input', updateDisplay);
+        // Register with knob manager
+        if (typeof knobManager !== 'undefined') {
+            knobManager.registerKnob(input, options);
+        }
 
-        // Double-click to edit
-        container.addEventListener('dblclick', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+        // Initial display update
+        updateKnobDisplay(input, valueDisplay);
 
-            const inputEl = document.createElement('input');
-            inputEl.type = 'text';
-            inputEl.className = 'value-input';
-            inputEl.value = valueDisplay.textContent;
-
-            container.appendChild(inputEl);
-            inputEl.select();
-            inputEl.focus();
-
-            const finishEdit = () => {
-                const newValue = parseFloat(inputEl.value) || 0;
-                const min = parseFloat(input.min) || 0;
-                const max = parseFloat(input.max) || 100;
-
-                // For EQ controls, use direct value
-                if (input.classList.contains('eq-low') || input.classList.contains('eq-mid') ||
-                    input.classList.contains('eq-high') || input.classList.contains('master-eq-low') ||
-                    input.classList.contains('master-eq-mid') || input.classList.contains('master-eq-high')) {
-                    input.value = Math.max(min, Math.min(max, newValue));
-                } else {
-                    // Convert 0-100 to actual range
-                    const actualValue = min + (Math.max(0, Math.min(100, newValue)) / 100) * (max - min);
-                    input.value = actualValue;
-                }
-
-                input.dispatchEvent(new Event('input'));
-                inputEl.remove();
-                updateDisplay();
-            };
-
-            inputEl.addEventListener('blur', finishEdit);
-            inputEl.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    finishEdit();
-                } else if (e.key === 'Escape') {
-                    inputEl.remove();
-                }
-            });
-        });
+        // Listen for input changes (from knob or other sources)
+        input.addEventListener('input', () => updateKnobDisplay(input, valueDisplay));
     });
 
-    // For vertical faders
+    // Setup fader interactions
     document.querySelectorAll('.vertical-fader').forEach(fader => {
         const container = fader.parentElement;
         const valueDisplay = container.querySelector('.fader-value');
 
-        // Update fader value display
-        const updateFaderDisplay = () => {
-            const value = Math.round((parseFloat(fader.value) / 100) * 100);
-            valueDisplay.textContent = value;
-        };
+        fader.addEventListener('input', () => {
+            if (valueDisplay) {
+                valueDisplay.textContent = Math.round(fader.value);
+            }
+        });
 
-        fader.addEventListener('input', updateFaderDisplay);
-
-        // Double-click to edit fader value
-        valueDisplay.addEventListener('dblclick', (e) => {
+        // Double-click to reset fader to 80
+        container.addEventListener('dblclick', (e) => {
             e.preventDefault();
-            e.stopPropagation();
-
-            const inputEl = document.createElement('input');
-            inputEl.type = 'text';
-            inputEl.className = 'value-input';
-            inputEl.value = valueDisplay.textContent;
-            inputEl.style.position = 'static';
-            inputEl.style.transform = 'none';
-
-            valueDisplay.style.display = 'none';
-            container.appendChild(inputEl);
-            inputEl.select();
-            inputEl.focus();
-
-            const finishEdit = () => {
-                const newValue = parseInt(inputEl.value) || 0;
-                fader.value = Math.max(0, Math.min(100, newValue));
-                fader.dispatchEvent(new Event('input'));
-                inputEl.remove();
-                valueDisplay.style.display = 'block';
-                updateFaderDisplay();
-            };
-
-            inputEl.addEventListener('blur', finishEdit);
-            inputEl.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    finishEdit();
-                } else if (e.key === 'Escape') {
-                    inputEl.remove();
-                    valueDisplay.style.display = 'block';
-                }
-            });
+            fader.value = 80;
+            fader.dispatchEvent(new Event('input', { bubbles: true }));
         });
     });
 }
 
-// Setup visual knob rotation indicators
-function setupKnobVisuals() {
-    document.querySelectorAll('.knob-container input[type="range"]').forEach(input => {
-        const container = input.parentElement;
+// Update knob display value
+function updateKnobDisplay(input, valueDisplay) {
+    const min = parseFloat(input.min) || 0;
+    const max = parseFloat(input.max) || 100;
+    const value = parseFloat(input.value);
 
-        // Update knob rotation
-        const updateKnob = () => {
-            const min = parseFloat(input.min) || 0;
-            const max = parseFloat(input.max) || 100;
-            const value = parseFloat(input.value);
+    // Speed knob (bipolar)
+    if (input.classList.contains('speed')) {
+        if (value === 0) {
+            valueDisplay.textContent = '1x';
+        } else if (value > 0) {
+            const rate = Math.pow(4, value / 100).toFixed(1);
+            valueDisplay.textContent = `${rate}x`;
+        } else {
+            const rate = Math.pow(4, Math.abs(value) / 100).toFixed(1);
+            valueDisplay.textContent = `R${rate}x`;
+        }
+        return;
+    }
 
-            // Calculate percentage (0-1)
-            const percent = (value - min) / (max - min);
+    // EQ controls (show dB)
+    if (input.classList.contains('eq-low') || input.classList.contains('eq-mid') ||
+        input.classList.contains('eq-high') || input.classList.contains('master-eq-low') ||
+        input.classList.contains('master-eq-mid') || input.classList.contains('master-eq-high')) {
+        valueDisplay.textContent = value > 0 ? `+${value}` : value;
+        return;
+    }
 
-            // Convert to rotation angle (-135deg to +135deg, 270 degree range)
-            const angle = -135 + (percent * 270);
+    // Default: normalize to 0-100
+    const normalized = Math.round(((value - min) / (max - min)) * 100);
+    valueDisplay.textContent = normalized;
 
-            // Update the ::after pseudo-element rotation using CSS variable
-            container.style.setProperty('--knob-rotation', `${angle}deg`);
-        };
-
-        // Initial update and listen for changes
-        updateKnob();
-        input.addEventListener('input', updateKnob);
-    });
+    // Update knob rotation
+    const container = input.parentElement;
+    const percent = (value - min) / (max - min);
+    const angle = -135 + (percent * 270);
+    container.style.setProperty('--knob-rotation', `${angle}deg`);
 }
 
-// Update knob rotation CSS
-const style = document.createElement('style');
-style.textContent = `
-    .knob-container::after {
-        transform: translateX(-50%) rotate(var(--knob-rotation, 0deg));
-    }
-`;
-document.head.appendChild(style);
-
-// Setup start button to initialize audio context
+// Setup start button
 function setupStartButton() {
-    // Check if we need to create a start button
     if (!document.getElementById('start-audio')) {
         const startBtn = document.createElement('button');
         startBtn.id = 'start-audio';
-        startBtn.textContent = 'START MIXER';
-        startBtn.style.position = 'fixed';
-        startBtn.style.top = '50%';
-        startBtn.style.left = '50%';
-        startBtn.style.transform = 'translate(-50%, -50%)';
-        startBtn.style.fontSize = '24px';
-        startBtn.style.padding = '20px 40px';
-        startBtn.style.background = '#e50914';
-        startBtn.style.color = 'white';
-        startBtn.style.border = 'none';
-        startBtn.style.cursor = 'pointer';
-        startBtn.style.zIndex = '1000';
+        startBtn.textContent = 'START';
         document.body.appendChild(startBtn);
 
         startBtn.addEventListener('click', async () => {
@@ -225,45 +225,33 @@ async function initializeRecorder() {
     visualizer.start();
 }
 
-// Setup transport bar controls
+// Setup transport bar controls with cached DOM
 function setupTransportControls() {
-    // Play All button
-    const playAllBtn = document.getElementById('play-all');
-    playAllBtn?.addEventListener('click', () => {
+    domCache.playAll?.addEventListener('click', () => {
         recorder.playAll();
-        playAllBtn.textContent = '❚❚ PAUSE';
+        domCache.playAll.textContent = 'PAUSE';
     });
 
-    // Stop All button
-    const stopAllBtn = document.getElementById('stop-all');
-    stopAllBtn?.addEventListener('click', () => {
+    domCache.stopAll?.addEventListener('click', () => {
         recorder.stopAll();
-        document.getElementById('play-all').textContent = '▶ PLAY';
+        domCache.playAll.textContent = 'PLAY';
     });
 
-    // Clear All button
-    const clearAllBtn = document.getElementById('clear-all');
-    clearAllBtn?.addEventListener('click', () => {
-        if (confirm('Clear all tracks? This cannot be undone.')) {
+    domCache.clearAll?.addEventListener('click', () => {
+        if (confirm('Clear all tracks?')) {
             recorder.clearAll();
         }
     });
 
-    // Export Mix button
-    const exportBtn = document.getElementById('export-mix');
-    exportBtn?.addEventListener('click', () => {
+    domCache.exportMix?.addEventListener('click', () => {
         recorder.exportMix();
     });
 
-    // Load Files button
-    const loadFilesBtn = document.getElementById('load-files');
-    const fileInput = document.getElementById('file-input');
-
-    loadFilesBtn?.addEventListener('click', () => {
-        fileInput?.click();
+    domCache.loadFiles?.addEventListener('click', () => {
+        domCache.fileInput?.click();
     });
 
-    fileInput?.addEventListener('change', async (e) => {
+    domCache.fileInput?.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         for (let i = 0; i < Math.min(files.length, 4); i++) {
             await recorder.loadFileToTrack(i, files[i]);
@@ -271,244 +259,229 @@ function setupTransportControls() {
         }
     });
 
-    // Audio source selector
-    const audioSourceSelect = document.getElementById('audioSourceSelect');
-    audioSourceSelect?.addEventListener('change', async (e) => {
+    domCache.audioSourceSelect?.addEventListener('change', async (e) => {
         await recorder.setAudioSource(e.target.value);
     });
 }
 
-// Setup controls for all tracks
+// Setup controls for all tracks using event delegation
 function setupTrackControls() {
+    // Use event delegation for buttons
+    document.querySelector('.mixer-console')?.addEventListener('click', handleMixerClick);
+
+    // Setup individual track knob/fader listeners
     for (let i = 0; i < 4; i++) {
-        setupTrackButtons(i);
         setupTrackKnobs(i);
         setupTrackFader(i);
     }
 }
 
-// Setup track buttons
-function setupTrackButtons(trackNumber) {
-    const track = recorder.getTrack(trackNumber);
+// Event delegation handler for mixer clicks
+function handleMixerClick(e) {
+    const target = e.target;
+    const trackNumber = parseInt(target.dataset.track);
 
-    // REC button
-    const recBtn = document.querySelector(`.rec-btn[data-track="${trackNumber}"]`);
-    recBtn?.addEventListener('click', async () => {
-        if (track.isRecording) {
-            track.stopRecording();
-            recBtn.classList.remove('active');
-            recBtn.textContent = 'REC';
-        } else {
-            await recorder.recordTrack(trackNumber);
-            recBtn.classList.add('active');
-            recBtn.textContent = 'STOP';
-        }
-    });
+    if (isNaN(trackNumber) && !target.classList.contains('clear-all')) return;
 
-    // Mode button (Loop/Normal)
-    const modeBtn = document.querySelector(`.mode-btn[data-track="${trackNumber}"]`);
-    modeBtn?.addEventListener('click', () => {
-        const newMode = track.mode === 'normal' ? 'loop' : 'normal';
-        track.setMode(newMode);
+    // Record button
+    if (target.classList.contains('rec-btn')) {
+        handleRecordClick(trackNumber);
+        return;
+    }
 
-        if (newMode === 'loop') {
-            modeBtn.classList.add('active');
-            modeBtn.textContent = 'LOOP';
-        } else {
-            modeBtn.classList.remove('active');
-            modeBtn.textContent = 'NORMAL';
-        }
-    });
+    // Mode button
+    if (target.classList.contains('mode-btn')) {
+        handleModeClick(trackNumber);
+        return;
+    }
 
     // Mute button
-    const muteBtn = document.querySelector(`.mute-btn[data-track="${trackNumber}"]`);
-    muteBtn?.addEventListener('click', () => {
-        track.isMuted = !track.isMuted;
-        track.setMute(track.isMuted);
-        muteBtn.classList.toggle('active', track.isMuted);
-    });
+    if (target.classList.contains('mute-btn')) {
+        handleMuteClick(trackNumber);
+        return;
+    }
 
     // Solo button
-    const soloBtn = document.querySelector(`.solo-btn[data-track="${trackNumber}"]`);
-    soloBtn?.addEventListener('click', () => {
-        recorder.handleSolo(trackNumber);
-        soloBtn.classList.toggle('active', track.isSolo);
-
-        // Update other solo buttons
-        for (let i = 0; i < 4; i++) {
-            if (i !== trackNumber) {
-                const otherSoloBtn = document.querySelector(`.solo-btn[data-track="${i}"]`);
-                otherSoloBtn?.classList.toggle('active', recorder.getTrack(i).isSolo);
-            }
-        }
-    });
+    if (target.classList.contains('solo-btn')) {
+        handleSoloClick(trackNumber);
+        return;
+    }
 
     // Clear button
-    const clearBtn = document.querySelector(`.clear-btn[data-track="${trackNumber}"]`);
-    clearBtn?.addEventListener('click', () => {
-        track.clear();
-        updateTrackIndicator(trackNumber, false);
-    });
+    if (target.classList.contains('clear-btn')) {
+        handleClearClick(trackNumber);
+        return;
+    }
+}
+
+function handleRecordClick(trackNumber) {
+    const track = recorder.getTrack(trackNumber);
+    const recBtn = domCache.recBtns[trackNumber];
+
+    if (track.isRecording) {
+        track.stopRecording();
+        recBtn?.classList.remove('active');
+        recBtn.textContent = 'REC';
+    } else {
+        recorder.recordTrack(trackNumber);
+        recBtn?.classList.add('active');
+        recBtn.textContent = 'STOP';
+    }
+}
+
+function handleModeClick(trackNumber) {
+    const track = recorder.getTrack(trackNumber);
+    const modeBtn = domCache.modeBtns[trackNumber];
+    const newMode = track.mode === 'normal' ? 'loop' : 'normal';
+
+    track.setMode(newMode);
+
+    if (newMode === 'loop') {
+        modeBtn?.classList.add('active');
+        modeBtn.textContent = 'LOOP';
+    } else {
+        modeBtn?.classList.remove('active');
+        modeBtn.textContent = 'NORM';
+    }
+}
+
+function handleMuteClick(trackNumber) {
+    const track = recorder.getTrack(trackNumber);
+    const muteBtn = domCache.muteBtns[trackNumber];
+
+    track.isMuted = !track.isMuted;
+    track.setMute(track.isMuted);
+    muteBtn?.classList.toggle('active', track.isMuted);
+}
+
+function handleSoloClick(trackNumber) {
+    const soloBtn = domCache.soloBtns[trackNumber];
+
+    recorder.handleSolo(trackNumber);
+
+    // Update all solo buttons
+    for (let i = 0; i < 4; i++) {
+        const btn = domCache.soloBtns[i];
+        const track = recorder.getTrack(i);
+        btn?.classList.toggle('active', track.isSolo);
+    }
+}
+
+function handleClearClick(trackNumber) {
+    const track = recorder.getTrack(trackNumber);
+    track.clear();
+    updateTrackIndicator(trackNumber, false);
 }
 
 // Setup track knob controls
 function setupTrackKnobs(trackNumber) {
-    const track = recorder.getTrack(trackNumber);
+    const track = () => recorder.getTrack(trackNumber);
 
     // Trim
-    const trimKnob = document.querySelector(`.trim[data-track="${trackNumber}"]`);
-    trimKnob?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        track.setTrimGain(value);
+    domCache.trimKnobs[trackNumber]?.addEventListener('input', (e) => {
+        track().setTrimGain(e.target.value / 100);
     });
 
     // Gain Boost
-    const gainBoostKnob = document.querySelector(`.gain-boost[data-track="${trackNumber}"]`);
-    gainBoostKnob?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        track.setGainBoost(value);
+    domCache.gainBoostKnobs[trackNumber]?.addEventListener('input', (e) => {
+        track().setGainBoost(e.target.value / 100);
     });
 
-    // Compressor Input (threshold)
-    const compInputKnob = document.querySelector(`.comp-input[data-track="${trackNumber}"]`);
-    compInputKnob?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        track.setLA2APeakReduction(value);
+    // Compressor Input
+    domCache.compInputKnobs[trackNumber]?.addEventListener('input', (e) => {
+        track().setLA2APeakReduction(e.target.value / 100);
     });
 
-    // Compressor Reduction (makeup gain)
-    const compReductionKnob = document.querySelector(`.comp-reduction[data-track="${trackNumber}"]`);
-    compReductionKnob?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        track.setLA2AGain(value);
+    // Compressor Reduction
+    domCache.compReductionKnobs[trackNumber]?.addEventListener('input', (e) => {
+        track().setLA2AGain(e.target.value / 100);
     });
 
-    // EQ Low
-    const eqLowKnob = document.querySelector(`.eq-low[data-track="${trackNumber}"]`);
-    eqLowKnob?.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        track.setEQLow(value);
+    // EQ
+    domCache.eqLowKnobs[trackNumber]?.addEventListener('input', (e) => {
+        track().setEQLow(parseFloat(e.target.value));
     });
 
-    // EQ Mid
-    const eqMidKnob = document.querySelector(`.eq-mid[data-track="${trackNumber}"]`);
-    eqMidKnob?.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        track.setEQMid(value);
+    domCache.eqMidKnobs[trackNumber]?.addEventListener('input', (e) => {
+        track().setEQMid(parseFloat(e.target.value));
     });
 
-    // EQ High
-    const eqHighKnob = document.querySelector(`.eq-high[data-track="${trackNumber}"]`);
-    eqHighKnob?.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        track.setEQHigh(value);
+    domCache.eqHighKnobs[trackNumber]?.addEventListener('input', (e) => {
+        track().setEQHigh(parseFloat(e.target.value));
     });
 
     // Reverb Send
-    const reverbSendKnob = document.querySelector(`.reverb-send[data-track="${trackNumber}"]`);
-    reverbSendKnob?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        track.setReverbSend(value);
+    domCache.reverbSendKnobs[trackNumber]?.addEventListener('input', (e) => {
+        track().setReverbSend(e.target.value / 100);
     });
 
-    // Speed
-    const speedKnob = document.querySelector(`.speed[data-track="${trackNumber}"]`);
-    speedKnob?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        track.setSpeed(value);
+    // Speed (bipolar: -100 to +100)
+    domCache.speedKnobs[trackNumber]?.addEventListener('input', (e) => {
+        track().setSpeed(parseFloat(e.target.value));
     });
 }
 
 // Setup track fader
 function setupTrackFader(trackNumber) {
-    const track = recorder.getTrack(trackNumber);
+    const fader = domCache.channelFaders[trackNumber];
+    const valueDisplay = domCache.faderValues[trackNumber];
 
-    // Channel Fader
-    const channelFader = document.querySelector(`.channel-fader[data-track="${trackNumber}"]`);
-    const faderValue = channelFader?.parentElement?.querySelector('.fader-value');
-
-    channelFader?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        track.setFader(value);
-        if (faderValue) {
-            faderValue.textContent = Math.round(e.target.value);
+    fader?.addEventListener('input', (e) => {
+        const track = recorder.getTrack(trackNumber);
+        track.setFader(e.target.value / 100);
+        if (valueDisplay) {
+            valueDisplay.textContent = Math.round(e.target.value);
         }
     });
 }
 
 // Setup master controls
 function setupMasterControls() {
-    // Master EQ Low
-    const masterEQLow = document.querySelector('.master-eq-low');
-    masterEQLow?.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        recorder.setMasterEQLow(value);
+    // Master EQ
+    domCache.masterEQLow?.addEventListener('input', (e) => {
+        recorder.setMasterEQLow(parseFloat(e.target.value));
     });
 
-    // Master EQ Mid
-    const masterEQMid = document.querySelector('.master-eq-mid');
-    masterEQMid?.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        recorder.setMasterEQMid(value);
+    domCache.masterEQMid?.addEventListener('input', (e) => {
+        recorder.setMasterEQMid(parseFloat(e.target.value));
     });
 
-    // Master EQ High
-    const masterEQHigh = document.querySelector('.master-eq-high');
-    masterEQHigh?.addEventListener('input', (e) => {
-        const value = parseFloat(e.target.value);
-        recorder.setMasterEQHigh(value);
+    domCache.masterEQHigh?.addEventListener('input', (e) => {
+        recorder.setMasterEQHigh(parseFloat(e.target.value));
     });
 
-    // Master Compressor Threshold
-    const masterCompThreshold = document.querySelector('.master-comp-threshold');
-    masterCompThreshold?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        recorder.setMasterLA2APeakReduction(value);
+    // Master Compressor
+    domCache.masterCompThreshold?.addEventListener('input', (e) => {
+        recorder.setMasterLA2APeakReduction(e.target.value / 100);
     });
 
-    // Master Compressor Makeup
-    const masterCompMakeup = document.querySelector('.master-comp-makeup');
-    masterCompMakeup?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        recorder.setMasterLA2AGain(value);
+    domCache.masterCompMakeup?.addEventListener('input', (e) => {
+        recorder.setMasterLA2AGain(e.target.value / 100);
     });
 
-    // Master Reverb Size
-    const masterReverbSize = document.querySelector('.master-reverb-size');
-    masterReverbSize?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        recorder.setMasterReverbSize(value * 45); // 0-45 seconds
+    // Master Reverb
+    domCache.masterReverbSize?.addEventListener('input', (e) => {
+        recorder.setMasterReverbSize(e.target.value / 100 * 45);
     });
 
-    // Master Reverb Mix
-    const masterReverbMix = document.querySelector('.master-reverb-mix');
-    masterReverbMix?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        recorder.setMasterReverbAmount(value);
+    domCache.masterReverbMix?.addEventListener('input', (e) => {
+        recorder.setMasterReverbAmount(e.target.value / 100);
     });
 
     // Master Fader
-    const masterFader = document.querySelector('.master-fader');
-    const masterFaderValue = masterFader?.parentElement?.querySelector('.fader-value');
-
-    masterFader?.addEventListener('input', (e) => {
-        const value = e.target.value / 100;
-        recorder.setMasterVolume(value);
-        if (masterFaderValue) {
-            masterFaderValue.textContent = Math.round(e.target.value);
+    domCache.masterFader?.addEventListener('input', (e) => {
+        recorder.setMasterVolume(e.target.value / 100);
+        if (domCache.masterFaderValue) {
+            domCache.masterFaderValue.textContent = Math.round(e.target.value);
         }
     });
 }
 
 // Update track audio indicator
 function updateTrackIndicator(trackNumber, hasAudio) {
-    const indicator = document.querySelector(`.channel-strip[data-track="${trackNumber}"] .audio-indicator`);
+    const indicator = domCache.audioIndicators[trackNumber];
     if (indicator) {
-        if (hasAudio) {
-            indicator.classList.add('active');
-        } else {
-            indicator.classList.remove('active');
-        }
+        indicator.classList.toggle('active', hasAudio);
     }
 }
 

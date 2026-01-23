@@ -1,5 +1,6 @@
 // Track Class
 // Handles individual track recording, playback, and loop modes
+// Includes bipolar speed control with reverse playback support
 
 class Track {
     constructor(audioContext, trackNumber, masterDestination, reverbSend) {
@@ -13,6 +14,7 @@ class Track {
         this.mediaRecorder = null;
         this.recordedChunks = [];
         this.audioBuffer = null;
+        this.reversedBuffer = null; // Pre-reversed buffer for compatibility
         this.source = null;
 
         // Playback state
@@ -22,7 +24,9 @@ class Track {
         this.mode = 'loop'; // 'normal' or 'loop'
         this.loopLength = 4.0; // seconds
         this.playbackRate = 1.0;
+        this.isReversed = false;
         this.startTime = 0;
+        this.pausedAt = 0;
 
         // Audio nodes
         this.createAudioNodes();
@@ -39,9 +43,9 @@ class Track {
 
         // Gain boost (pre-compressor)
         this.gainBoost = this.ctx.createGain();
-        this.gainBoost.gain.value = 1.0; // Unity gain by default
+        this.gainBoost.gain.value = 1.0;
 
-        // 3-band EQ (will be connected AFTER compressor)
+        // 3-band EQ
         this.eqLow = this.ctx.createBiquadFilter();
         this.eqLow.type = 'lowshelf';
         this.eqLow.frequency.value = 200;
@@ -60,43 +64,36 @@ class Track {
 
         // Channel fader (final gain stage)
         this.channelFader = this.ctx.createGain();
-        this.channelFader.gain.value = 0.8; // Default fader position
-
-        // Note: Pan removed per requirements
-        // Signal chain will be connected in setupTapeEffects()
+        this.channelFader.gain.value = 0.8;
     }
 
     setupTapeEffects() {
-        // LA-2A style compressor (smooth, musical, program-dependent)
+        // LA-2A style compressor
         this.la2aCompressor = this.ctx.createDynamicsCompressor();
-        this.la2aCompressor.threshold.value = -24; // dB
-        this.la2aCompressor.knee.value = 12; // Soft knee for smooth compression
-        this.la2aCompressor.ratio.value = 4; // 4:1 ratio
-        this.la2aCompressor.attack.value = 0.010; // 10ms attack (tube-style)
-        this.la2aCompressor.release.value = 0.100; // 100ms release (program-dependent feel)
+        this.la2aCompressor.threshold.value = -24;
+        this.la2aCompressor.knee.value = 12;
+        this.la2aCompressor.ratio.value = 4;
+        this.la2aCompressor.attack.value = 0.010;
+        this.la2aCompressor.release.value = 0.100;
 
-        // LA-2A makeup gain (after compressor for gain reduction compensation)
+        // LA-2A makeup gain
         this.la2aMakeupGain = this.ctx.createGain();
-        this.la2aMakeupGain.gain.value = 1.0; // Unity gain by default (0dB)
+        this.la2aMakeupGain.gain.value = 1.0;
 
-        // Wow/flutter (detune oscillator) - for tape speed variations
+        // Wow/flutter LFO
         this.wowFlutterLFO = this.ctx.createOscillator();
         this.wowFlutterGain = this.ctx.createGain();
         this.wowFlutterLFO.frequency.value = 0.3 + (Math.random() * 0.2);
         this.wowFlutterLFO.type = 'sine';
-        this.wowFlutterGain.gain.value = 0; // Start with no wow/flutter
+        this.wowFlutterGain.gain.value = 0;
         this.wowFlutterLFO.connect(this.wowFlutterGain);
         this.wowFlutterLFO.start();
 
-        // Reverb send gain (post-EQ, pre-fader)
+        // Reverb send gain
         this.reverbSendGain = this.ctx.createGain();
-        this.reverbSendGain.gain.value = 0; // Start with no reverb send
+        this.reverbSendGain.gain.value = 0;
 
-        // NEW SIGNAL CHAIN:
-        // 1. Trim → 2. Gain Boost → 3. Compressor → 4. Makeup Gain →
-        // 5. EQ (Low→Mid→High) → 6. Reverb Send (parallel) → 7. Channel Fader → Master
-
-        // Connect main signal path
+        // Signal chain
         this.trimGain.connect(this.gainBoost);
         this.gainBoost.connect(this.la2aCompressor);
         this.la2aCompressor.connect(this.la2aMakeupGain);
@@ -106,7 +103,7 @@ class Track {
         this.eqHigh.connect(this.channelFader);
         this.channelFader.connect(this.masterDestination);
 
-        // Reverb send (parallel path from post-EQ, pre-fader)
+        // Reverb send (parallel path)
         this.eqHigh.connect(this.reverbSendGain);
         this.reverbSendGain.connect(this.reverbSend);
     }
@@ -117,7 +114,6 @@ class Track {
         this.isRecording = true;
         this.recordedChunks = [];
 
-        // Create MediaRecorder
         this.mediaRecorder = new MediaRecorder(stream, {
             mimeType: 'audio/webm'
         });
@@ -148,40 +144,66 @@ class Track {
 
         try {
             this.audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
-            // Auto-set loop length to 100% of recording
             this.loopLength = this.audioBuffer.duration;
 
-            // Update audio loaded indicator
+            // Pre-generate reversed buffer for browser compatibility
+            this.reversedBuffer = this.createReversedBuffer(this.audioBuffer);
+
             this.updateAudioIndicator(true);
         } catch (error) {
             console.error('Error decoding audio:', error);
         }
     }
 
+    // Create a reversed version of the audio buffer
+    createReversedBuffer(buffer) {
+        const reversed = this.ctx.createBuffer(
+            buffer.numberOfChannels,
+            buffer.length,
+            buffer.sampleRate
+        );
+
+        for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+            const originalData = buffer.getChannelData(channel);
+            const reversedData = reversed.getChannelData(channel);
+
+            for (let i = 0; i < buffer.length; i++) {
+                reversedData[i] = originalData[buffer.length - 1 - i];
+            }
+        }
+
+        return reversed;
+    }
+
     play(when = 0) {
         if (!this.audioBuffer || this.isPlaying) return;
 
-        this.stop(); // Stop any existing playback
+        this.stop();
 
         this.source = this.ctx.createBufferSource();
-        this.source.buffer = this.audioBuffer;
-        this.source.playbackRate.value = this.playbackRate;
 
-        // Connect wow/flutter to detune if enabled
+        // Use reversed buffer if playing in reverse
+        if (this.isReversed && this.reversedBuffer) {
+            this.source.buffer = this.reversedBuffer;
+            this.source.playbackRate.value = Math.abs(this.playbackRate);
+        } else {
+            this.source.buffer = this.audioBuffer;
+            this.source.playbackRate.value = Math.abs(this.playbackRate);
+        }
+
+        // Connect wow/flutter if enabled
         if (this.wowFlutterGain.gain.value > 0) {
             this.wowFlutterGain.connect(this.source.detune);
         }
 
-        // Connect to effects chain (starts at trim gain)
+        // Connect to effects chain
         this.source.connect(this.trimGain);
 
         if (this.mode === 'loop') {
-            // Loop mode: set loop points based on loopLength
             this.source.loop = true;
             this.source.loopStart = 0;
             this.source.loopEnd = Math.min(this.loopLength, this.audioBuffer.duration);
         } else {
-            // Normal mode: play once
             this.source.loop = false;
         }
 
@@ -213,41 +235,80 @@ class Track {
     clear() {
         this.stop();
         this.audioBuffer = null;
+        this.reversedBuffer = null;
         this.recordedChunks = [];
-
-        // Update audio loaded indicator
         this.updateAudioIndicator(false);
     }
 
     updateAudioIndicator(isLoaded) {
         const indicator = document.querySelector(`.audio-indicator[data-track="${this.trackNumber}"]`);
         if (indicator) {
-            if (isLoaded) {
-                indicator.classList.add('loaded');
-            } else {
-                indicator.classList.remove('loaded');
-            }
+            indicator.classList.toggle('loaded', isLoaded);
         }
     }
 
     // Control methods
     setTrimGain(value) {
-        // value is 0-1, where 0.5 = 50% = original level
         this.trimGain.gain.value = value;
     }
 
     setFader(value) {
-        // Channel fader control (0-1)
         this.channelFader.gain.value = value;
     }
 
     setGainBoost(value) {
-        // Gain boost control (0-1 maps to 0-2x gain)
         this.gainBoost.gain.value = value * 2;
     }
 
-    setSpeed(value) {
+    // Bipolar speed control: -100 to +100
+    // Center (0) = normal speed (1x)
+    // Right (+100) = forward up to 4x
+    // Left (-100) = reverse up to 4x
+    setSpeed(normalizedValue) {
+        // normalizedValue is -100 to +100 (from knob with min=-100, max=100, center=0)
+        const wasPlaying = this.isPlaying;
+
+        if (normalizedValue === 0) {
+            // Center position = 1x forward
+            this.playbackRate = 1.0;
+            this.isReversed = false;
+        } else if (normalizedValue > 0) {
+            // Right side: forward, exponential curve up to 4x
+            // Map 0-100 to 1-4 using exponential curve
+            const normalized = normalizedValue / 100; // 0 to 1
+            this.playbackRate = Math.pow(4, normalized); // 1 to 4
+            this.isReversed = false;
+        } else {
+            // Left side: reverse, exponential curve up to 4x
+            // Map -100 to 0 -> 4x to 1x reverse
+            const normalized = Math.abs(normalizedValue) / 100; // 0 to 1
+            this.playbackRate = Math.pow(4, normalized); // 1 to 4
+            this.isReversed = true;
+        }
+
+        // Update currently playing source
+        if (this.source && this.isPlaying) {
+            // Check if we need to switch buffers (forward <-> reverse)
+            const needsBufferSwitch = wasPlaying && (
+                (this.isReversed && this.source.buffer === this.audioBuffer) ||
+                (!this.isReversed && this.source.buffer === this.reversedBuffer)
+            );
+
+            if (needsBufferSwitch) {
+                // Restart with new direction
+                this.stop();
+                this.play();
+            } else {
+                // Just update rate
+                this.source.playbackRate.value = Math.abs(this.playbackRate);
+            }
+        }
+    }
+
+    // Legacy speed control (0-1 range) for backward compatibility
+    setSpeedLegacy(value) {
         this.playbackRate = value;
+        this.isReversed = false;
         if (this.source) {
             this.source.playbackRate.value = value;
         }
@@ -266,32 +327,23 @@ class Track {
     }
 
     setLA2APeakReduction(amount) {
-        // amount is 0-1, controls LA-2A compressor threshold
-        // 0 = no compression (-10dB threshold)
-        // 1 = max compression (-40dB threshold)
-        const threshold = -10 - (amount * 30); // -10dB to -40dB
+        const threshold = -10 - (amount * 30);
         this.la2aCompressor.threshold.value = threshold;
-
-        // Also adjust ratio for program-dependent feel (3:1 to 8:1)
         const ratio = 3 + (amount * 5);
         this.la2aCompressor.ratio.value = ratio;
     }
 
     setLA2AGain(amount) {
-        // amount is 0-1, controls makeup gain
-        // 0 = 0dB (unity), 1 = +20dB
         const gainDb = amount * 20;
         const gainLinear = Math.pow(10, gainDb / 20);
         this.la2aMakeupGain.gain.value = gainLinear;
     }
 
     setReverbSend(amount) {
-        // amount is 0-1
         this.reverbSendGain.gain.value = amount;
     }
 
     setWowFlutter(amount) {
-        // Amount in cents (0-15)
         this.wowFlutterGain.gain.value = amount * 15;
     }
 
@@ -307,7 +359,6 @@ class Track {
     setMode(mode) {
         this.mode = mode;
         if (this.isPlaying) {
-            // Restart playback in new mode
             this.stop();
             this.play();
         }
@@ -320,12 +371,11 @@ class Track {
         }
     }
 
-    // Get current playback position
     getCurrentTime() {
         if (!this.isPlaying || !this.source) return 0;
 
         const elapsed = this.ctx.currentTime - this.startTime;
-        const adjustedTime = elapsed * this.playbackRate;
+        const adjustedTime = elapsed * Math.abs(this.playbackRate);
 
         if (this.mode === 'loop' && this.audioBuffer) {
             return adjustedTime % Math.min(this.loopLength, this.audioBuffer.duration);
@@ -334,9 +384,15 @@ class Track {
         return adjustedTime;
     }
 
-    // Get audio buffer for visualization
     getAudioBuffer() {
         return this.audioBuffer;
+    }
+
+    // Get current speed display value
+    getSpeedDisplay() {
+        const rate = Math.abs(this.playbackRate).toFixed(2);
+        const direction = this.isReversed ? 'REV' : 'FWD';
+        return `${rate}x ${direction}`;
     }
 }
 

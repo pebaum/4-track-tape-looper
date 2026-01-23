@@ -1,238 +1,235 @@
-// Visualizer Module
-// Handles waveform displays and VU meters
+// Visualizer Module - Optimized for Performance
+// Handles VU meters with throttled 30fps updates
 
 class Visualizer {
-    constructor() {
-        this.waveformCanvases = [];
-        this.waveformContexts = [];
-        this.vuCanvases = { left: null, right: null };
-        this.vuContexts = { left: null, right: null };
+    constructor(analyser, audioContext) {
+        this.analyser = analyser;
+        this.ctx = audioContext;
+
+        // VU meter elements
+        this.vuCanvasLeft = null;
+        this.vuCanvasRight = null;
+        this.vuCtxLeft = null;
+        this.vuCtxRight = null;
+
+        // Animation state
         this.animationFrameId = null;
+        this.lastFrameTime = 0;
+        this.targetFPS = 30;
+        this.frameInterval = 1000 / this.targetFPS;
+
+        // Cached data array for performance
+        this.dataArray = null;
+
+        // Peak hold state
+        this.peakLeft = 0;
+        this.peakRight = 0;
+        this.peakDecay = 0.95;
+
+        // Colors (Bauhaus grayscale)
+        this.colors = {
+            background: '#0D0D0D',
+            meter: '#F5F5F5',
+            meterDim: 'rgba(245, 245, 245, 0.4)',
+            peak: '#A3A3A3',
+            clip: '#D32F2F',
+            border: '#404040'
+        };
+
+        this.init();
     }
 
-    // Initialize waveform canvases
-    initWaveforms() {
-        for (let i = 0; i < 4; i++) {
-            const canvas = document.getElementById(`waveform${i}`);
-            const ctx = canvas.getContext('2d');
-            this.waveformCanvases[i] = canvas;
-            this.waveformContexts[i] = ctx;
+    init() {
+        // Get VU meter canvases
+        this.vuCanvasLeft = document.getElementById('vu-left');
+        this.vuCanvasRight = document.getElementById('vu-right');
 
-            // Initial clear
-            this.clearWaveform(i);
+        if (this.vuCanvasLeft && this.vuCanvasRight) {
+            this.vuCtxLeft = this.vuCanvasLeft.getContext('2d');
+            this.vuCtxRight = this.vuCanvasRight.getContext('2d');
         }
-    }
 
-    // Initialize VU meter canvases
-    initVUMeters() {
-        this.vuCanvases.left = document.getElementById('vuLeft');
-        this.vuCanvases.right = document.getElementById('vuRight');
-        this.vuContexts.left = this.vuCanvases.left.getContext('2d');
-        this.vuContexts.right = this.vuCanvases.right.getContext('2d');
+        // Configure analyser for performance (smaller FFT)
+        if (this.analyser) {
+            this.analyser.fftSize = 256; // Smaller for performance
+            this.analyser.smoothingTimeConstant = 0.8;
+            this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+        }
 
+        // Initial clear
         this.clearVUMeters();
     }
 
-    // Draw waveform from audio buffer
-    drawWaveform(trackNumber, audioBuffer, currentTime = 0, isPlaying = false) {
-        if (!audioBuffer) {
-            this.clearWaveform(trackNumber);
-            return;
-        }
-
-        const canvas = this.waveformCanvases[trackNumber];
-        const ctx = this.waveformContexts[trackNumber];
-        const width = canvas.width;
-        const height = canvas.height;
-
-        // Clear canvas
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, width, height);
-
-        // Get audio data
-        const data = audioBuffer.getChannelData(0);
-        const step = Math.ceil(data.length / width);
-        const amp = height / 2;
-
-        // Draw waveform
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-
-        for (let i = 0; i < width; i++) {
-            const min = Math.min(...Array.from({ length: step }, (_, j) => data[i * step + j] || 0));
-            const max = Math.max(...Array.from({ length: step }, (_, j) => data[i * step + j] || 0));
-
-            if (i === 0) {
-                ctx.moveTo(i, amp + min * amp);
-            }
-            ctx.lineTo(i, amp + min * amp);
-            ctx.lineTo(i, amp + max * amp);
-        }
-
-        ctx.stroke();
-
-        // Draw playhead if playing
-        if (isPlaying && currentTime > 0) {
-            const progress = currentTime / audioBuffer.duration;
-            const x = progress * width;
-
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
-        }
-
-        // Draw loop marker if in loop mode
-        if (audioBuffer.duration > 0) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(0, height / 2);
-            ctx.lineTo(width, height / 2);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
+    start() {
+        if (!this.analyser) return;
+        this.animate();
     }
 
-    // Draw loop region on waveform
-    drawLoopRegion(trackNumber, audioBuffer, loopLength) {
-        if (!audioBuffer) return;
-
-        const canvas = this.waveformCanvases[trackNumber];
-        const ctx = this.waveformContexts[trackNumber];
-        const width = canvas.width;
-        const height = canvas.height;
-
-        const loopEnd = Math.min(loopLength, audioBuffer.duration);
-        const loopEndX = (loopEnd / audioBuffer.duration) * width;
-
-        // Draw loop region highlight
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.fillRect(0, 0, loopEndX, height);
-
-        // Draw loop end marker
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(loopEndX, 0);
-        ctx.lineTo(loopEndX, height);
-        ctx.stroke();
-    }
-
-    // Clear waveform
-    clearWaveform(trackNumber) {
-        const canvas = this.waveformCanvases[trackNumber];
-        const ctx = this.waveformContexts[trackNumber];
-
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw center line
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, canvas.height / 2);
-        ctx.lineTo(canvas.width, canvas.height / 2);
-        ctx.stroke();
-    }
-
-    // Draw VU meters
-    drawVUMeter(channel, level) {
-        const canvas = this.vuCanvases[channel];
-        const ctx = this.vuContexts[channel];
-        const width = canvas.width;
-        const height = canvas.height;
-
-        // Clear
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, width, height);
-
-        // Draw border
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0, 0, width, height);
-
-        // Clamp level between 0 and 1
-        level = Math.max(0, Math.min(1, level));
-
-        // Draw meter bar
-        const barWidth = width * level;
-
-        // Color gradient based on level
-        if (level > 0.9) {
-            ctx.fillStyle = 'rgba(255, 68, 68, 0.8)'; // Red for clipping
-        } else if (level > 0.7) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // Bright white
-        } else {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'; // Dim white
-        }
-
-        ctx.fillRect(0, 0, barWidth, height);
-
-        // Draw tick marks
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = 1;
-        for (let i = 0.25; i <= 1; i += 0.25) {
-            const x = width * i;
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
-        }
-    }
-
-    // Clear VU meters
-    clearVUMeters() {
-        this.drawVUMeter('left', 0);
-        this.drawVUMeter('right', 0);
-    }
-
-    // Update VU meters with analyzer data
-    updateVUMeters(analyser) {
-        if (!analyser) {
-            this.clearVUMeters();
-            return;
-        }
-
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteTimeDomainData(dataArray);
-
-        // Calculate RMS for both channels (simplified - treating as mono)
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-            const normalized = (dataArray[i] - 128) / 128;
-            sum += normalized * normalized;
-        }
-        const rms = Math.sqrt(sum / dataArray.length);
-
-        // Convert to dB-like scale
-        const level = Math.min(1, rms * 3);
-
-        // Draw both meters (simplified - same level for both)
-        this.drawVUMeter('left', level);
-        this.drawVUMeter('right', level);
-    }
-
-    // Start animation loop for VU meters
-    startVUAnimation(analyser) {
-        const animate = () => {
-            this.updateVUMeters(analyser);
-            this.animationFrameId = requestAnimationFrame(animate);
-        };
-        animate();
-    }
-
-    // Stop animation loop
-    stopVUAnimation() {
+    stop() {
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
         this.clearVUMeters();
+    }
+
+    animate() {
+        this.animationFrameId = requestAnimationFrame(() => this.animate());
+
+        // Throttle to target FPS
+        const now = performance.now();
+        const elapsed = now - this.lastFrameTime;
+
+        if (elapsed < this.frameInterval) return;
+
+        this.lastFrameTime = now - (elapsed % this.frameInterval);
+        this.updateVUMeters();
+    }
+
+    updateVUMeters() {
+        if (!this.analyser || !this.dataArray) return;
+
+        // Get time domain data
+        this.analyser.getByteTimeDomainData(this.dataArray);
+
+        // Calculate RMS level (simplified stereo simulation)
+        let sumLeft = 0;
+        let sumRight = 0;
+        const halfLength = this.dataArray.length / 2;
+
+        for (let i = 0; i < halfLength; i++) {
+            const normalizedLeft = (this.dataArray[i] - 128) / 128;
+            const normalizedRight = (this.dataArray[i + halfLength] - 128) / 128;
+            sumLeft += normalizedLeft * normalizedLeft;
+            sumRight += normalizedRight * normalizedRight;
+        }
+
+        const rmsLeft = Math.sqrt(sumLeft / halfLength);
+        const rmsRight = Math.sqrt(sumRight / halfLength);
+
+        // Scale to 0-1 range with some amplification
+        const levelLeft = Math.min(1, rmsLeft * 3);
+        const levelRight = Math.min(1, rmsRight * 3);
+
+        // Update peak hold
+        if (levelLeft > this.peakLeft) {
+            this.peakLeft = levelLeft;
+        } else {
+            this.peakLeft *= this.peakDecay;
+        }
+
+        if (levelRight > this.peakRight) {
+            this.peakRight = levelRight;
+        } else {
+            this.peakRight *= this.peakDecay;
+        }
+
+        // Draw meters
+        this.drawVUMeter(this.vuCtxLeft, this.vuCanvasLeft, levelLeft, this.peakLeft);
+        this.drawVUMeter(this.vuCtxRight, this.vuCanvasRight, levelRight, this.peakRight);
+    }
+
+    drawVUMeter(ctx, canvas, level, peak) {
+        if (!ctx || !canvas) return;
+
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // Clear with background color
+        ctx.fillStyle = this.colors.background;
+        ctx.fillRect(0, 0, width, height);
+
+        // Clamp values
+        level = Math.max(0, Math.min(1, level));
+        peak = Math.max(0, Math.min(1, peak));
+
+        // Calculate meter height (bottom to top)
+        const meterHeight = height * level;
+        const peakY = height - (height * peak);
+
+        // Draw meter bar
+        if (level > 0.9) {
+            // Clipping - use accent color
+            ctx.fillStyle = this.colors.clip;
+        } else if (level > 0.6) {
+            // High level - bright
+            ctx.fillStyle = this.colors.meter;
+        } else {
+            // Normal level - dimmer
+            ctx.fillStyle = this.colors.meterDim;
+        }
+
+        ctx.fillRect(0, height - meterHeight, width, meterHeight);
+
+        // Draw peak indicator
+        if (peak > 0.01) {
+            ctx.fillStyle = this.colors.peak;
+            ctx.fillRect(0, peakY, width, 2);
+        }
+
+        // Draw level markers
+        ctx.strokeStyle = this.colors.border;
+        ctx.lineWidth = 1;
+
+        // -6dB mark (75%)
+        const mark6db = height * 0.25;
+        ctx.beginPath();
+        ctx.moveTo(0, mark6db);
+        ctx.lineTo(width * 0.3, mark6db);
+        ctx.stroke();
+
+        // -12dB mark (50%)
+        const mark12db = height * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, mark12db);
+        ctx.lineTo(width * 0.3, mark12db);
+        ctx.stroke();
+
+        // -24dB mark (25%)
+        const mark24db = height * 0.75;
+        ctx.beginPath();
+        ctx.moveTo(0, mark24db);
+        ctx.lineTo(width * 0.3, mark24db);
+        ctx.stroke();
+    }
+
+    clearVUMeters() {
+        if (this.vuCtxLeft && this.vuCanvasLeft) {
+            this.vuCtxLeft.fillStyle = this.colors.background;
+            this.vuCtxLeft.fillRect(0, 0, this.vuCanvasLeft.width, this.vuCanvasLeft.height);
+        }
+
+        if (this.vuCtxRight && this.vuCanvasRight) {
+            this.vuCtxRight.fillStyle = this.colors.background;
+            this.vuCtxRight.fillRect(0, 0, this.vuCanvasRight.width, this.vuCanvasRight.height);
+        }
+
+        this.peakLeft = 0;
+        this.peakRight = 0;
+    }
+
+    // Legacy method compatibility
+    initVUMeters() {
+        // Already initialized in constructor
+    }
+
+    startVUAnimation(analyser) {
+        if (analyser) {
+            this.analyser = analyser;
+            this.analyser.fftSize = 256;
+            this.analyser.smoothingTimeConstant = 0.8;
+            this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+        }
+        this.start();
+    }
+
+    stopVUAnimation() {
+        this.stop();
+    }
+
+    // Unused waveform methods removed for cleanup
+    clearWaveform() {
+        // No-op for compatibility
     }
 }
 

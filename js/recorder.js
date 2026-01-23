@@ -515,15 +515,13 @@ class Recorder {
 
             // Set the buffer on the track
             track.audioBuffer = audioBuffer;
+            track.loopLength = audioBuffer.duration;
             track.hasAudio = true;
 
-            // Update UI to show loaded state
-            const recordBtn = document.querySelector(`.track:nth-child(${trackNumber + 1}) .record-btn`);
-            if (recordBtn) {
-                recordBtn.classList.add('has-audio');
-            }
+            // Pre-generate reversed buffer for bipolar speed control
+            track.reversedBuffer = track.createReversedBuffer(audioBuffer);
 
-            this.updateStatus(`LOADED AUDIO TO TRACK ${trackNumber + 1}`);
+            this.updateStatus(`LOADED CH ${trackNumber + 1}`);
             console.log(`Loaded file to track ${trackNumber + 1}`);
         } catch (error) {
             console.error('Error loading file:', error);
