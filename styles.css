@@ -382,12 +382,12 @@ body {
     content: '';
     position: absolute;
     width: 2px;
-    height: 16px;  /* Fixed height for indicator */
+    height: 12px;  /* Short indicator line */
     background: var(--text-primary);
     left: 50%;
-    top: 20px;  /* 16px label space + 4px inset */
-    transform: translateX(-50%);
-    transform-origin: center 16px;  /* Rotate around knob center */
+    top: 36px;  /* Center of knob (16px padding + 20px half-knob) */
+    transform: translateX(-50%) rotate(var(--knob-rotation, 0deg));
+    transform-origin: center top;  /* Rotate around the center of the knob */
     transition: transform 0.05s ease-out;
     pointer-events: none;
     border-radius: 1px;
@@ -780,8 +780,4 @@ body {
     }
 }
 
-/* Knob rotation via CSS variable - override for JS-controlled rotation */
-.knob-container::after {
-    transform: translateX(-50%) rotate(var(--knob-rotation, 0deg));
-    transform-origin: center 16px;  /* Rotate around knob center */
-}
+/* Knob rotation via CSS variable is now in main ::after definition */
