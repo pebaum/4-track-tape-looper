@@ -67,8 +67,8 @@ class Recorder {
         // Master reverb - supports up to 45 second decay (Deep Listening style)
         this.masterReverb = this.ctx.createConvolver();
         this.masterReverbSize = 7.0; // 7 second decay default
-        // Start with a small buffer, worker will generate larger ones
-        this.masterReverb.buffer = this.generateReverbImpulse(this.masterReverbSize, this.masterReverbSize);
+        // Start with tiny 0.5s buffer to avoid blocking UI, worker will generate real one
+        this.masterReverb.buffer = this.generateReverbImpulse(0.5, 0.5);
 
         // Initialize reverb web worker for generating large impulses without freezing
         this.reverbWorker = new Worker('js/reverb-worker.js');
@@ -87,6 +87,13 @@ class Recorder {
                 this.reverbCache.delete(firstKey);
             }
         };
+
+        // Request real reverb buffer from worker (non-blocking)
+        this.reverbWorker.postMessage({
+            decay: this.masterReverbSize,
+            length: this.masterReverbSize,
+            sampleRate: this.ctx.sampleRate
+        });
 
         // Reverb wet/dry mix
         this.reverbMix = this.ctx.createGain();
@@ -545,6 +552,11 @@ class Recorder {
 
             // Pre-generate reversed buffer for bipolar speed control
             track.reversedBuffer = track.createReversedBuffer(audioBuffer);
+
+            // AUTO-PLAY: Start looping immediately after file load
+            if (!track.isPlaying) {
+                track.play();
+            }
 
             this.updateStatus(`LOADED CH ${trackNumber + 1}`);
             console.log(`Loaded file to track ${trackNumber + 1}`);

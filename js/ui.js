@@ -6,7 +6,6 @@ let recorder = null;
 // DOM Cache - populated at init for performance
 const domCache = {
     // Transport
-    playAll: null,
     stopAll: null,
     clearAll: null,
     exportMix: null,
@@ -67,7 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // Cache all DOM elements at init for performance
 function cacheDOM() {
     // Transport
-    domCache.playAll = document.getElementById('play-all');
     domCache.stopAll = document.getElementById('stop-all');
     domCache.clearAll = document.getElementById('clear-all');
     domCache.exportMix = document.getElementById('export-mix');
@@ -253,14 +251,9 @@ async function initializeRecorder() {
 
 // Setup transport bar controls with cached DOM
 function setupTransportControls() {
-    domCache.playAll?.addEventListener('click', () => {
-        recorder.playAll();
-        domCache.playAll.textContent = 'PAUSE';
-    });
-
+    // STOP pauses all tracks (tracks auto-play when content loads)
     domCache.stopAll?.addEventListener('click', () => {
         recorder.stopAll();
-        domCache.playAll.textContent = 'PLAY';
     });
 
     domCache.clearAll?.addEventListener('click', () => {
@@ -501,29 +494,50 @@ function setupMasterControls() {
         }
     });
 
-    // Tape Bus Controls
+    // Tape Bus Controls (debounced to prevent performance issues)
+    let tapeSaturationTimeout, tapeWowTimeout, tapeFlutterTimeout;
+    let tapeDropoutsTimeout, tapeHissTimeout, tapeAgeTimeout;
+
     domCache.tapeSaturation?.addEventListener('input', (e) => {
-        recorder.setTapeSaturation(parseFloat(e.target.value));
+        clearTimeout(tapeSaturationTimeout);
+        tapeSaturationTimeout = setTimeout(() => {
+            recorder.setTapeSaturation(parseFloat(e.target.value));
+        }, 150);
     });
 
     domCache.tapeWow?.addEventListener('input', (e) => {
-        recorder.setTapeWow(parseFloat(e.target.value));
+        clearTimeout(tapeWowTimeout);
+        tapeWowTimeout = setTimeout(() => {
+            recorder.setTapeWow(parseFloat(e.target.value));
+        }, 100);
     });
 
     domCache.tapeFlutter?.addEventListener('input', (e) => {
-        recorder.setTapeFlutter(parseFloat(e.target.value));
+        clearTimeout(tapeFlutterTimeout);
+        tapeFlutterTimeout = setTimeout(() => {
+            recorder.setTapeFlutter(parseFloat(e.target.value));
+        }, 100);
     });
 
     domCache.tapeDropouts?.addEventListener('input', (e) => {
-        recorder.setTapeDropouts(parseFloat(e.target.value));
+        clearTimeout(tapeDropoutsTimeout);
+        tapeDropoutsTimeout = setTimeout(() => {
+            recorder.setTapeDropouts(parseFloat(e.target.value));
+        }, 200);
     });
 
     domCache.tapeHiss?.addEventListener('input', (e) => {
-        recorder.setTapeHiss(parseFloat(e.target.value));
+        clearTimeout(tapeHissTimeout);
+        tapeHissTimeout = setTimeout(() => {
+            recorder.setTapeHiss(parseFloat(e.target.value));
+        }, 100);
     });
 
     domCache.tapeAge?.addEventListener('input', (e) => {
-        recorder.setTapeAge(parseFloat(e.target.value));
+        clearTimeout(tapeAgeTimeout);
+        tapeAgeTimeout = setTimeout(() => {
+            recorder.setTapeAge(parseFloat(e.target.value));
+        }, 150);
     });
 
     // Tape Bypass Button

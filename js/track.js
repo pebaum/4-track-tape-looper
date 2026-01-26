@@ -150,6 +150,11 @@ class Track {
             this.reversedBuffer = this.createReversedBuffer(this.audioBuffer);
 
             this.updateAudioIndicator(true);
+
+            // AUTO-PLAY: Start looping immediately after recording
+            if (!this.isPlaying) {
+                this.play();
+            }
         } catch (error) {
             console.error('Error decoding audio:', error);
         }

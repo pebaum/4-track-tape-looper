@@ -193,15 +193,19 @@ class CassetteTapeBus {
         const normalized = value / 100;
         this.saturationAmount = normalized;
 
-        // Update waveshaper curve
-        this.updateSaturationCurve(normalized);
-
+        // Immediate: update emphasis (cheap operations)
         // Pre-emphasis increases with saturation (frequency-dependent saturation)
         // +0dB at 0%, +6dB at 100%
         this.preEmphasis.gain.value = normalized * 6;
 
         // De-emphasis compensates
         this.deEmphasis.gain.value = -normalized * 6;
+
+        // Debounced: regenerate curve (expensive - 8192 Math.tanh() calls)
+        if (this._saturationTimeout) clearTimeout(this._saturationTimeout);
+        this._saturationTimeout = setTimeout(() => {
+            this.updateSaturationCurve(normalized);
+        }, 150);
     }
 
     // Wow: 0-100 -> slow pitch variation (0-40 cents)
@@ -244,6 +248,12 @@ class CassetteTapeBus {
     }
 
     scheduleDropout() {
+        // Clear any existing timer to prevent accumulation
+        if (this.dropoutSchedulerId) {
+            clearTimeout(this.dropoutSchedulerId);
+            this.dropoutSchedulerId = null;
+        }
+
         if (this.dropoutIntensity <= 0 || this.bypassed) return;
 
         // Interval: 15000ms at low intensity, 3000ms at high
