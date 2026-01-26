@@ -6,6 +6,7 @@ let recorder = null;
 // DOM Cache - populated at init for performance
 const domCache = {
     // Transport
+    playAll: null,
     stopAll: null,
     clearAll: null,
     exportMix: null,
@@ -66,6 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Cache all DOM elements at init for performance
 function cacheDOM() {
     // Transport
+    domCache.playAll = document.getElementById('play-all');
     domCache.stopAll = document.getElementById('stop-all');
     domCache.clearAll = document.getElementById('clear-all');
     domCache.exportMix = document.getElementById('export-mix');
@@ -251,7 +253,10 @@ async function initializeRecorder() {
 
 // Setup transport bar controls with cached DOM
 function setupTransportControls() {
-    // STOP pauses all tracks (tracks auto-play when content loads)
+    domCache.playAll?.addEventListener('click', () => {
+        recorder.playAll();
+    });
+
     domCache.stopAll?.addEventListener('click', () => {
         recorder.stopAll();
     });
